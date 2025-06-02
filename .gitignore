@@ -1,0 +1,13 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Data files
+data/
+strategyquant_data.xlsx
+
+# Environments
+.env
+
+# Streamlit cache
+.streamlit/
