@@ -203,5 +203,15 @@ if os.path.exists(RAW_DATA):
         from export_strategyquant import export_to_excel
         export_to_excel()
         st.success('Arquivo strategyquant_data.xlsx gerado!')
+        # Botões de download para StrategyQuant
+        with open('strategyquant_data.xlsx', 'rb') as f:
+            excel_data = f.read()
+        st.download_button('Baixar Excel', excel_data, file_name='strategyquant_data.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        with open('strategyquant_params.csv', 'rb') as f:
+            params_data = f.read()
+        st.download_button('Baixar Parâmetros', params_data, file_name='strategyquant_params.csv', mime='text/csv')
+        with open('strategyquant_trade_config.csv', 'rb') as f:
+            trade_data = f.read()
+        st.download_button('Baixar Configuração de Trade', trade_data, file_name='strategyquant_trade_config.csv', mime='text/csv')
 else:
     st.info('Clique em "Baixar dados dos ativos" para iniciar.')
