@@ -134,34 +134,36 @@ if os.path.exists(RAW_DATA):
     # Retorno Mensal do Portfólio
     st.markdown('**Passo 4:** Acompanhe o retorno de cada mês para entender a consistência dos ganhos.')
     st.subheader('Retorno Mensal do Portfólio')
-    # agrega retornos para cada mês
-    monthly_returns = (1 + portfolio_returns).resample('ME').prod() - 1
-    st.bar_chart(monthly_returns)
+    # retorna retornos mensais do portfólio e de cada ativo
+    monthly_portfolio = (1 + portfolio_returns).resample('ME').prod() - 1
+    st.bar_chart(monthly_portfolio)
+    # DataFrame de retornos mensais por ativo (para encontrar melhor combinação)
+    monthly_assets = (1 + returns).resample('ME').prod() - 1
 
-    # Melhor portfólio baseado em retorno médio mensal
+    # Melhor portfólio baseado em retorno médio mensal (ativos)
     if st.button('Melhor Portfólio Mensal'):
         best_avg = -float('inf')
         best_combo = None
         best_series = None
-        # busca combinatória de 3 até todos ativos
+        # busca combinatória de 3 até todos ativos selecionados
         for k in range(3, len(selected)+1):
             for combo in itertools.combinations(selected, k):
-                avg = monthly_returns[list(combo)].mean(axis=1).mean()
+                avg = monthly_assets[list(combo)].mean(axis=1).mean()
                 if avg > best_avg:
                     best_avg = avg
                     best_combo = combo
-                    best_series = monthly_returns[list(combo)].mean(axis=1)
+                    best_series = monthly_assets[list(combo)].mean(axis=1)
         # Exibir resultados
         st.subheader('Melhor Portfólio (Retorno Mensal)')
         st.write(f"Ativos: {best_combo}")
         st.write(f"Retorno médio mensal: {best_avg:.2%}")
         st.line_chart(best_series)
 
-    # filtro por retorno mínimo
+    # filtro por retorno mínimo do portfólio
     min_month = st.slider('Retorno Mensal Mínimo (%)', -20.0, 20.0, 0.0)
-    highlight = monthly_returns[monthly_returns >= (min_month/100)]
+    highlight = monthly_portfolio[monthly_portfolio >= (min_month/100)]
     if not highlight.empty:
-        st.markdown(f"**Meses com retorno mensal ≥ {min_month:.2f}%**")
+        st.markdown(f"**Meses com retorno mensal do portfólio ≥ {min_month:.2f}%**")
         st.write(highlight.apply(lambda x: f"{x:.2%}"))
 
     # PCA
