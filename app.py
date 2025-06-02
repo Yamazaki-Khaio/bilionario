@@ -1,18 +1,38 @@
 import streamlit as st
+from PIL import Image
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import yfinance as yf
 import os
+import socket
+import itertools  # para combinação de portfólios
+
+# Exibe logo da ferramenta (homenagem a Khaio Geovan)
+logo = Image.open('logo.png')
+st.image(logo, width=150)
 
 # Configurações
 DATA_DIR = 'data'
 RAW_DATA = os.path.join(DATA_DIR, 'raw_data.csv')
 
 st.title('Análise de Portfólio com PCA')
+st.markdown(
+    'Bem-vindo! Esta ferramenta permite analisar carteiras de investimento de forma simples. '  
+    'Siga os passos para baixar dados, selecionar ativos, avaliar desempenho e gerar exportações.'
+)
+st.markdown(
+    '[Acesse online ▶️](https://bilionario-3w62sdcxhsf3i8yfqywoaq.streamlit.app/)'
+)
+# Exibe URL automática de acesso
+host = socket.gethostname()
+ip = socket.gethostbyname(host)
+port = os.getenv('PORT', '8501')
+st.markdown(f"**URL de acesso:** http://{ip}:{port}")
 
 # Botão para baixar dados
 if st.button('Baixar dados dos ativos'):
+    st.markdown('**Passo 1:** Baixe dados históricos ajustados de preços via Yahoo Finance.')
     from data_fetch import fetch_data
     fetch_data()
     st.success('Dados baixados com sucesso!')
@@ -23,10 +43,20 @@ if os.path.exists(RAW_DATA):
     st.subheader('Preços Ajustados')
     st.dataframe(df.tail())
 
+    # Seleção de ativos (3 a 10)
+    selected = st.sidebar.multiselect(
+        'Selecione ativos (3-10)', df.columns.tolist(), default=df.columns.tolist()[:5]
+    )
+    if len(selected) < 3 or len(selected) > 10:
+        st.warning('Selecione entre 3 e 10 ativos para prosseguir')
+        st.stop()
+    df = df[selected]
+
     # Cálculo de retornos
     returns = df.pct_change().dropna()
-    
+
     # Seção de Performance do Portfólio
+    st.markdown('**Passo 3:** Veja as métricas de desempenho do seu portfólio, como retorno total, volatilidade e drawdown.')
     st.subheader('Performance do Portfólio')
     initial_capital = st.number_input('Capital Inicial (R$)', min_value=100.0, value=10000.0, step=100.0)
     # Retorno do portfólio igualmente ponderado
@@ -53,11 +83,58 @@ if os.path.exists(RAW_DATA):
     fig_rr.update_traces(textposition='top center')
     st.plotly_chart(fig_rr)
 
+    # Botão para gerar portfólio ótimo baseado em top 3 ativos por retorno mensal médio
+    st.markdown('**Passo 5:** Encontre a combinação ótima de ativos com melhor retorno mensal médio.')
+    if st.button('Gerar Portfólio Ótimo (Top 3 Retorno Mensal)'):
+        # Retornos mensais de cada ativo
+        monthly_ret = (1 + returns).resample('M').prod() - 1
+        # Média de retorno mensal por ativo
+        avg_mon = monthly_ret.mean().sort_values(ascending=False)
+        top3 = avg_mon.head(3).index.tolist()
+        st.markdown(f"**Top 3 Ativos:** {', '.join(top3)} com retorno mensal médio de {avg_mon.head(3).values*100:.2f}%")
+        # Cálculo para portfólio top3
+        returns_top3 = returns[top3]
+        portf_top3 = returns_top3.mean(axis=1)
+        cum_top3 = (1 + portf_top3).cumprod() * initial_capital
+        st.subheader('Valor Cumulado - Portfólio Ótimo Top 3')
+        st.line_chart(cum_top3, height=200)
+        # Mostrar métricas do portfólio ótimo
+        tr_opt = cum_top3.iloc[-1]/initial_capital - 1
+        ar_opt = portf_top3.mean()*252
+        av_opt = portf_top3.std()*(252**0.5)
+        dd_opt = ((cum_top3 - cum_top3.cummax())/cum_top3.cummax()).min()
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric('Retorno Total (Top3)', f"{tr_opt:.2%}")
+        c2.metric('Retorno Anualizado (Top3)', f"{ar_opt:.2%}")
+        c3.metric('Volatilidade Anual (Top3)', f"{av_opt:.2%}")
+        c4.metric('Drawdown Máximo (Top3)', f"{dd_opt:.2%}")
+
     # Retorno Mensal do Portfólio
+    st.markdown('**Passo 4:** Acompanhe o retorno de cada mês para entender a consistência dos ganhos.')
     st.subheader('Retorno Mensal do Portfólio')
     # agrega retornos para cada mês
     monthly_returns = (1 + portfolio_returns).resample('M').prod() - 1
     st.bar_chart(monthly_returns)
+
+    # Melhor portfólio baseado em retorno médio mensal
+    if st.button('Melhor Portfólio Mensal'):
+        best_avg = -float('inf')
+        best_combo = None
+        best_series = None
+        # busca combinatória de 3 até todos ativos
+        for k in range(3, len(selected)+1):
+            for combo in itertools.combinations(selected, k):
+                avg = monthly_returns[list(combo)].mean(axis=1).mean()
+                if avg > best_avg:
+                    best_avg = avg
+                    best_combo = combo
+                    best_series = monthly_returns[list(combo)].mean(axis=1)
+        # Exibir resultados
+        st.subheader('Melhor Portfólio (Retorno Mensal)')
+        st.write(f"Ativos: {best_combo}")
+        st.write(f"Retorno médio mensal: {best_avg:.2%}")
+        st.line_chart(best_series)
+
     # filtro por retorno mínimo
     min_month = st.slider('Retorno Mensal Mínimo (%)', -20.0, 20.0, 0.0)
     highlight = monthly_returns[monthly_returns >= (min_month/100)]
@@ -66,10 +143,11 @@ if os.path.exists(RAW_DATA):
         st.write(highlight.apply(lambda x: f"{x:.2%}"))
 
     # PCA
+    st.markdown('**Passo 6:** Analise a estrutura de risco usando PCA: variância explicada, scree plot e cargas dos componentes.')
     n_components = st.sidebar.slider('Número de componentes PCA', 1, min(returns.shape[1], 10), 5)
 
     # PCA
-    pca = PCA(n_components=n_components)
+    pca = PCA(n_components=n_components, random_state=42)
     components = pca.fit_transform(returns)
     explained = pca.explained_variance_ratio_
 
@@ -91,6 +169,7 @@ if os.path.exists(RAW_DATA):
         st.pyplot(fig2)
 
     # Exportar para Excel StrategyQuant
+    st.markdown('**Passo 7:** Exporte preços e parâmetros de indicadores técnicos para uso no StrategyQuant.')
     if st.button('Exportar para StrategyQuant'): 
         from export_strategyquant import export_to_excel
         export_to_excel()
