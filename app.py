@@ -23,8 +23,49 @@ if os.path.exists(RAW_DATA):
     st.subheader('Preços Ajustados')
     st.dataframe(df.tail())
 
-    # Retornos
+    # Cálculo de retornos
     returns = df.pct_change().dropna()
+    
+    # Seção de Performance do Portfólio
+    st.subheader('Performance do Portfólio')
+    initial_capital = st.number_input('Capital Inicial (R$)', min_value=100.0, value=10000.0, step=100.0)
+    # Retorno do portfólio igualmente ponderado
+    portfolio_returns = returns.mean(axis=1)
+    portfolio_cum = (1 + portfolio_returns).cumprod() * initial_capital
+    # Métricas
+    total_return = portfolio_cum.iloc[-1] / initial_capital - 1
+    annual_return = portfolio_returns.mean() * 252
+    annual_vol = portfolio_returns.std() * (252**0.5)
+    running_max = portfolio_cum.cummax()
+    drawdown = (portfolio_cum - running_max) / running_max
+    max_dd = drawdown.min()
+    # Exibição de métricas
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric('Retorno Total', f"{total_return:.2%}")
+    col2.metric('Retorno Anualizado', f"{annual_return:.2%}")
+    col3.metric('Volatilidade Anual', f"{annual_vol:.2%}")
+    col4.metric('Drawdown Máximo', f"{max_dd:.2%}")
+    # Gráfico de valor cumulativo
+    st.line_chart(portfolio_cum, height=250)
+    # Risco vs Retorno
+    import plotly.express as px
+    fig_rr = px.scatter(x=[annual_vol], y=[annual_return], text=['Portfólio'], labels={'x':'Volatilidade Anual','y':'Retorno Anualizado'}, title='Risco vs Retorno')
+    fig_rr.update_traces(textposition='top center')
+    st.plotly_chart(fig_rr)
+
+    # Retorno Mensal do Portfólio
+    st.subheader('Retorno Mensal do Portfólio')
+    # agrega retornos para cada mês
+    monthly_returns = (1 + portfolio_returns).resample('M').prod() - 1
+    st.bar_chart(monthly_returns)
+    # filtro por retorno mínimo
+    min_month = st.slider('Retorno Mensal Mínimo (%)', -20.0, 20.0, 0.0)
+    highlight = monthly_returns[monthly_returns >= (min_month/100)]
+    if not highlight.empty:
+        st.markdown(f"**Meses com retorno mensal ≥ {min_month:.2f}%**")
+        st.write(highlight.apply(lambda x: f"{x:.2%}"))
+
+    # PCA
     n_components = st.sidebar.slider('Número de componentes PCA', 1, min(returns.shape[1], 10), 5)
 
     # PCA
