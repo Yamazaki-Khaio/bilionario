@@ -109,7 +109,11 @@ if os.path.exists(RAW_DATA):
         # Média de retorno mensal por ativo
         avg_mon = monthly_ret.mean().sort_values(ascending=False)
         top3 = avg_mon.head(3).index.tolist()
-        st.markdown(f"**Top 3 Ativos:** {', '.join(top3)} com retorno mensal médio de {avg_mon.head(3).values*100:.2f}%")
+        # Formata os valores de retorno médio mensal de cada ativo
+        avg_values = avg_mon.head(3).values * 100
+        fmt_vals = ', '.join([f"{v:.2f}%" for v in avg_values])
+        # Exibe Top 3 ativos com retornos corretamente formatados
+        st.markdown(f"**Top 3 Ativos:** {', '.join(top3)} com retorno mensal médio de {fmt_vals}")
         # Cálculo para portfólio top3
         returns_top3 = returns[top3]
         portf_top3 = returns_top3.mean(axis=1)
