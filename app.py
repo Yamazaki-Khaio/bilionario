@@ -40,20 +40,44 @@ if st.button('Baixar dados dos ativos'):
 # Carregar dados se existir
 if os.path.exists(RAW_DATA):
     df = pd.read_csv(RAW_DATA, index_col=0, parse_dates=True)
-    st.subheader('Preços Ajustados')
-    st.dataframe(df.tail())
-
-    # Seleção de ativos (3 a 10)
+    # Mantém dataframe completo para cálculos de melhor combinação
+    df_full = df.copy()
+    # Calcula retornos completos para auto-seleção
+    returns_full = df_full / df_full.shift(1) - 1
+    returns_full = returns_full.dropna()
+    monthly_full = (1 + returns_full).resample('ME').prod() - 1
+    # Botão para auto-preencher seleção de ativos
+    if 'selected' not in st.session_state:
+        st.session_state['selected'] = df_full.columns.tolist()[:5]
+    if st.sidebar.button('Auto-preencher melhores ativos'):
+        best_avg = -float('inf')
+        best_combo = None
+        # Testa combinações de 3 a 10
+        for k in range(3, min(10, len(df_full.columns)) + 1):
+            for combo in itertools.combinations(df_full.columns, k):
+                avg = monthly_full[list(combo)].mean(axis=1).mean()
+                if avg > best_avg:
+                    best_avg = avg
+                    best_combo = combo
+        st.session_state['selected'] = list(best_combo)
+        st.sidebar.success(f'Selecionados: {best_combo}')
+    # Multiselect de ativos com session_state
     selected = st.sidebar.multiselect(
-        'Selecione ativos (3-10)', df.columns.tolist(), default=df.columns.tolist()[:5]
+        'Selecione ativos (3-10)', df.columns.tolist(),
+        default=st.session_state['selected'],
+        key='selected'
     )
     if len(selected) < 3 or len(selected) > 10:
         st.warning('Selecione entre 3 e 10 ativos para prosseguir')
         st.stop()
     df = df[selected]
 
-    # Cálculo de retornos
-    returns = df.pct_change().dropna()
+    # Cálculo de retornos (diferença percentual manual para evitar warnings)
+    returns = df / df.shift(1) - 1
+    returns = returns.dropna()
+    # Suprimir warnings de FutureWarning
+    import warnings
+    warnings.filterwarnings('ignore', category=FutureWarning)
 
     # Seção de Performance do Portfólio
     st.markdown('**Passo 3:** Veja as métricas de desempenho do seu portfólio, como retorno total, volatilidade e drawdown.')
@@ -113,7 +137,7 @@ if os.path.exists(RAW_DATA):
     st.markdown('**Passo 4:** Acompanhe o retorno de cada mês para entender a consistência dos ganhos.')
     st.subheader('Retorno Mensal do Portfólio')
     # agrega retornos para cada mês
-    monthly_returns = (1 + portfolio_returns).resample('M').prod() - 1
+    monthly_returns = (1 + portfolio_returns).resample('ME').prod() - 1
     st.bar_chart(monthly_returns)
 
     # Melhor portfólio baseado em retorno médio mensal
@@ -144,7 +168,12 @@ if os.path.exists(RAW_DATA):
 
     # PCA
     st.markdown('**Passo 6:** Analise a estrutura de risco usando PCA: variância explicada, scree plot e cargas dos componentes.')
-    n_components = st.sidebar.slider('Número de componentes PCA', 1, min(returns.shape[1], 10), 5)
+    # PCA: número de componentes não pode exceder ativos; default em 5 ou menos
+    n_feats = returns.shape[1]
+    default_n = min(5, n_feats)
+    n_components = st.sidebar.slider(
+        'Número de componentes PCA', 1, n_feats, default_n
+    )
 
     # PCA
     pca = PCA(n_components=n_components, random_state=42)
