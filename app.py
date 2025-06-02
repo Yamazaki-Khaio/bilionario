@@ -22,14 +22,8 @@ st.markdown(
     'Siga os passos para baixar dados, selecionar ativos, avaliar desempenho e gerar exportações.'
 )
 st.markdown(
-    '[Acesse online ▶️](https://bilionario-3w62sdcxhsf3i8yfqywoaq.streamlit.app/)'
+    '[Acesse online e compartilhe ▶️](https://bilionario-3w62sdcxhsf3i8yfqywoaq.streamlit.app/)'
 )
-# Exibe URL automática de acesso
-host = socket.gethostname()
-ip = socket.gethostbyname(host)
-port = os.getenv('PORT', '8501')
-st.markdown(f"**URL de acesso:** http://{ip}:{port}")
-
 # Botão para baixar dados
 if st.button('Baixar dados dos ativos'):
     st.markdown('**Passo 1:** Baixe dados históricos ajustados de preços via Yahoo Finance.')
