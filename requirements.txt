@@ -1,8 +1,12 @@
-yfinance
-pandas
-scikit-learn
 streamlit
+pandas
 matplotlib
+scikit-learn
+yfinance
+pillow
 plotly
+PyPDF2
+beautifulsoup4
 openpyxl
-pandas-ta
+seaborn
+numpy
