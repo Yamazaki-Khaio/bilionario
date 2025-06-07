@@ -579,13 +579,12 @@ if os.path.exists(RAW_DATA):
         
         with tab1:
             st.markdown("### 📈 Comparação de Performance")
-            
-            # Configurações
+              # Configurações
             col1, col2 = st.columns(2)
             with col1:
                 normalize_adv = st.checkbox("Normalizar capital inicial", value=True, key="normalize_advanced")
             with col2:
-                show_detailed_metrics = st.checkbox("Mostrar métricas detalhadas", value=True)
+                show_detailed_metrics = st.checkbox("Mostrar métricas detalhadas", value=True, key="show_detailed_metrics_main")
 
             # Extração segura de dados MT5
             mt5_profit = mt5_data.get('net_profit', 0)
@@ -646,13 +645,12 @@ if os.path.exists(RAW_DATA):
         
         with tab2:
             st.markdown("### 📈 Comparação de Performance")
-            
-            # Configurações
+              # Configurações
             col1, col2 = st.columns(2)
             with col1:
                 normalize_adv = st.checkbox("Normalizar capital inicial", value=True, key="normalize_advanced_mt5")
             with col2:
-                show_detailed_metrics = st.checkbox("Mostrar métricas detalhadas", value=True)
+                show_detailed_metrics = st.checkbox("Mostrar métricas detalhadas", value=True, key="show_detailed_metrics_tab2")
 
             # Extração segura de dados MT5
             mt5_profit = mt5_data.get('net_profit', 0)
