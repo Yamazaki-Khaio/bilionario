@@ -633,22 +633,24 @@ if os.path.exists(RAW_DATA):
             })
             
             fig_comp = px.bar(comp_df, x='Estratégia', y='Equity Final (R$)',
-                             color='Performance', 
+                 color='Performance', 
                              title='Comparação de Equity Normalizado',
                              color_discrete_map={'PCA': 'blue', 'MT5': 'red'})
-            st.plotly_chart(fig_comp, use_container_width=True)            # Evolução Temporal
+            st.plotly_chart(fig_comp, use_container_width=True)
+            
+            # Evolução Temporal
             st.markdown("### 📈 Evolução Temporal")
             temporal_fig = plot_temporal_comparison(portf_ret, mt5_data, common_capital)
             if temporal_fig:
                 st.plotly_chart(temporal_fig, use_container_width=True)
-
+        
         with tab2:
             st.markdown("### 📈 Comparação de Performance")
             
             # Configurações
             col1, col2 = st.columns(2)
             with col1:
-                normalize_adv = st.checkbox("Normalizar capital inicial", value=True, key="normalize_advanced")
+                normalize_adv = st.checkbox("Normalizar capital inicial", value=True, key="normalize_advanced_mt5")
             with col2:
                 show_detailed_metrics = st.checkbox("Mostrar métricas detalhadas", value=True)
 
@@ -1119,23 +1121,20 @@ if os.path.exists(RAW_DATA):
                         st.metric("Cointegração", cointegrated)
                     
                     if coint_result['is_cointegrated']:
-                        st.success("🎉 Os ativos são cointegrados! Pair trading é viável.")
-                        
-                        # Gerar sinais de trading
-                        signals = pair_analysis.generate_signals()
+                        st.success("🎉 Os ativos são cointegrados! Pair trading é viável.")                        # Gerar sinais de trading
+                        signals = pair_analysis.generate_trading_signals(coint_result)
                         
                         # Realizar backtesting
-                        backtest_results = pair_analysis.backtest_strategy(initial_capital=10000)
+                        backtest_results = pair_analysis.backtest_strategy(coint_result, signals)
                         
                         # Visualizações
                         st.subheader("📈 Visualizações da Estratégia")
-                        
-                        # Spread e sinais
-                        fig_spread = pair_analysis.plot_spread_and_signals()
+                          # Spread e sinais
+                        fig_spread = pair_analysis.plot_spread_and_signals(asset1, asset2)
                         if fig_spread:
                             st.plotly_chart(fig_spread, use_container_width=True)
                           # Performance
-                        fig_performance = pair_analysis.plot_strategy_performance()
+                        fig_performance = pair_analysis.plot_strategy_performance(asset1, asset2)
                         if fig_performance:
                             st.plotly_chart(fig_performance, use_container_width=True)
                         
