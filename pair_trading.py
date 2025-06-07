@@ -518,3 +518,66 @@ class PairTradingAnalysis:
             legend=dict(x=0.02, y=0.02, bgcolor="white")
         )
         return fig
+
+    def analyze_pair(self, asset1, asset2, lookback_period=90, z_threshold=2.0):
+        """
+        Analisa um par específico de ativos para pair trading
+        
+        Args:
+            asset1 (str): Nome do primeiro ativo
+            asset2 (str): Nome do segundo ativo
+            lookback_period (int): Período de lookback em dias
+            z_threshold (float): Threshold para sinais de trading
+            
+        Returns:
+            dict: Resultados da análise
+        """
+        try:
+            # Verificar se os ativos existem
+            if asset1 not in self.price_data.columns or asset2 not in self.price_data.columns:
+                return None
+            
+            # Calcular correlação
+            if self.correlation_matrix is None:
+                self.correlation_matrix = self.returns_data.corr()
+            
+            correlation = self.correlation_matrix.loc[asset1, asset2]
+            
+            # Teste de cointegração
+            coint_result = self.test_cointegration(asset1, asset2)
+            
+            if coint_result is None:
+                return None
+            
+            # Gerar sinais de trading
+            signals = self.generate_trading_signals(
+                coint_result,
+                entry_threshold=z_threshold,
+                exit_threshold=z_threshold/2
+            )
+            
+            # Contar sinais
+            buy_signals = len(signals[signals['signal'] == 1])
+            sell_signals = len(signals[signals['signal'] == -1])
+            total_signals = buy_signals + sell_signals
+            
+            # Executar backtest básico
+            backtest_result = self.backtest_strategy(coint_result, signals)
+            
+            return {
+                'correlation': correlation,
+                'cointegration': '✅ Sim' if coint_result.get('is_cointegrated', False) else '❌ Não',
+                'p_value': coint_result.get('p_value', 1.0),
+                'signals': total_signals,
+                'buy_signals': buy_signals,
+                'sell_signals': sell_signals,
+                'sharpe_ratio': backtest_result.get('sharpe_ratio', 0) if backtest_result else 0,
+                'total_return': backtest_result.get('total_return', 0) if backtest_result else 0,
+                'coint_result': coint_result,
+                'trading_signals': signals,
+                'backtest': backtest_result
+            }
+            
+        except Exception as e:
+            st.error(f"Erro na análise do par {asset1}/{asset2}: {str(e)}")
+            return None
