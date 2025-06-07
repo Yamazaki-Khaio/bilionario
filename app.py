@@ -77,9 +77,7 @@ def calculate_metrics(returns, initial_capital):
         'total_return': total_return,
         'annual_return': annual_return,
         'annual_volatility': annual_volatility,
-        'max_drawdown': max_drawdown,
-        'equity_curve': equity_curve,
-        'drawdown': drawdown
+        'max_drawdown': max_drawdown
     }
 
 def get_monthly_returns(returns):

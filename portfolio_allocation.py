@@ -157,14 +157,12 @@ class PortfolioAllocationManager:
                 cum_returns = (1 + sector_return_series).cumprod()
                 running_max = cum_returns.expanding().max()
                 drawdown = (cum_returns / running_max - 1).min()
-                
                 sector_performance[sector] = {
                     'total_return': total_return,
                     'annual_return': annual_return,
                     'volatility': volatility,
                     'sharpe_ratio': sharpe,
                     'max_drawdown': drawdown,
-                    'cum_returns': cum_returns,
                     'assets': assets,
                     'allocation': self.sector_allocations.get(sector, 0)
                 }
