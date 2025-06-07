@@ -17,6 +17,25 @@ warnings.filterwarnings("ignore")
 # Adicionar import do parser MT5
 from mt5_parser import MT5ReportParser
 
+# Importar novos módulos
+from pca_advanced import PCAAdvancedAnalysis
+from pair_trading import PairTradingAnalysis
+from portfolio_allocation import PortfolioAllocationManager
+from data_fetch import ASSET_CATEGORIES
+
+# Constantes para literais duplicados
+MT5_REAL_LABEL = 'MT5 Real'
+PCA_PORTFOLIO_LABEL = 'PCA Portfolio'
+SYMBOL_COLUMN = 'Símbolo'
+PL_ABS_COLUMN = 'P&L_Abs'
+LOSS_LABEL = 'Prejuízo'
+PROFIT_LABEL = 'Lucro'
+TOTAL_RETURN_LABEL = "Retorno Total"
+MAX_DRAWDOWN_LABEL = "Max Drawdown"
+
+# Configurar gerador de números aleatórios do numpy
+rng = np.random.default_rng(42)
+
 # Adicionar as funções que estão faltando
 def calculate_metrics(returns, initial_capital):
     """Calcula métricas de performance do portfolio"""
@@ -49,10 +68,7 @@ def calculate_metrics(returns, initial_capital):
 
 def get_monthly_returns(returns):
     """Calcula retornos mensais"""
-    if isinstance(returns, pd.Series):
-        monthly = returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
-    else:
-        monthly = returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
+    monthly = returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
     return monthly
 
 def plot_temporal_comparison(pca_returns, mt5_data, initial_capital):
@@ -67,20 +83,18 @@ def plot_temporal_comparison(pca_returns, mt5_data, initial_capital):
         
         # Criar curva simulada MT5 (interpolação linear)
         dates = pca_cum.index
-        
-        # Usar numpy corretamente
+          # Usar numpy corretamente
         mt5_values = np.linspace(mt5_initial, mt5_balance, len(dates))
-        mt5_curve = pd.Series(mt5_values, index=dates, name='MT5 Real')
+        mt5_curve = pd.Series(mt5_values, index=dates, name=MT5_REAL_LABEL)
         
         # Criar gráfico interativo com Plotly
         fig = go.Figure()
-        
-        # Adicionar linha PCA
+          # Adicionar linha PCA
         fig.add_trace(go.Scatter(
             x=pca_cum.index,
             y=pca_cum.values,
             mode='lines',
-            name='PCA Portfolio',
+            name=PCA_PORTFOLIO_LABEL,
             line=dict(color='blue', width=2),
             hovertemplate='<b>PCA</b><br>Data: %{x}<br>Equity: R$ %{y:,.2f}<extra></extra>'
         ))
@@ -90,7 +104,7 @@ def plot_temporal_comparison(pca_returns, mt5_data, initial_capital):
             x=mt5_curve.index,
             y=mt5_curve.values,
             mode='lines',
-            name='MT5 Real',
+            name=MT5_REAL_LABEL,
             line=dict(color='red', width=2, dash='dash'),
             hovertemplate='<b>MT5</b><br>Data: %{x}<br>Equity: R$ %{y:,.2f}<extra></extra>'
         ))
@@ -125,9 +139,8 @@ def plot_drawdown_comparison(pca_returns, mt5_data):
         
         # Criar série temporal simulada para MT5 drawdown
         dates = pca_drawdown.index
-        
-        # Simular drawdown MT5 variável
-        mt5_dd_values = np.random.uniform(-mt5_dd_value, 0, len(dates))
+          # Simular drawdown MT5 variável
+        mt5_dd_values = rng.uniform(-mt5_dd_value, 0, len(dates))
         mt5_drawdown = pd.Series(mt5_dd_values, index=dates).rolling(window=10).mean()
         
         fig = go.Figure()
@@ -229,8 +242,7 @@ def create_performance_radar_chart(pca_metrics, mt5_data, risk_metrics):
             normalize_metric(mt5_return, -0.5, 1.0),  # Retorno
             normalize_metric(1 / max(risk_metrics['mt5']['drawdown'], 0.01), 0, 10),  # Risco invertido
             normalize_metric(risk_metrics['mt5']['profit_factor'], 0, 3),  # Profit Factor como proxy Sharpe
-            normalize_metric(risk_metrics['mt5']['recovery_factor'], 0, 10),  # Recuperação
-            normalize_metric(risk_metrics['mt5']['win_rate'], 0, 1) * 10  # Win Rate como consistência
+            normalize_metric(risk_metrics['mt5']['recovery_factor'], 0, 10),  # Recuperação        normalize_metric(risk_metrics['mt5']['win_rate'], 0, 1) * 10  # Win Rate como consistência
         ]
         
         fig = go.Figure()
@@ -239,7 +251,7 @@ def create_performance_radar_chart(pca_metrics, mt5_data, risk_metrics):
             r=pca_values,
             theta=categories,
             fill='toself',
-            name='PCA Portfolio',
+            name=PCA_PORTFOLIO_LABEL,
             line_color='blue',
             fillcolor='rgba(0,0,255,0.1)'
         ))
@@ -248,7 +260,7 @@ def create_performance_radar_chart(pca_metrics, mt5_data, risk_metrics):
             r=mt5_values,
             theta=categories,
             fill='toself',
-            name='MT5 Real',
+            name=MT5_REAL_LABEL,
             line_color='red',
             fillcolor='rgba(255,0,0,0.1)'
         ))
@@ -283,39 +295,35 @@ def create_portfolio_allocation_analysis(mt5_data):
         
         if not valid_symbols:
             return None
-            
-        # Criar DataFrame
+              # Criar DataFrame
         symbol_df = pd.DataFrame([
-            {'Símbolo': symbol, 'P&L': profit, 'P&L_Abs': abs(profit)}
+            {SYMBOL_COLUMN: symbol, 'P&L': profit, PL_ABS_COLUMN: abs(profit)}
             for symbol, profit in valid_symbols.items()
         ])
-        
-        # Calcular percentuais
-        total_abs = symbol_df['P&L_Abs'].sum()
+          # Calcular percentuais
+        total_abs = symbol_df[PL_ABS_COLUMN].sum()
         if total_abs > 0:
-            symbol_df['Percentual'] = (symbol_df['P&L_Abs'] / total_abs * 100).round(2)
+            symbol_df['Percentual'] = (symbol_df[PL_ABS_COLUMN] / total_abs * 100).round(2)
         else:
             symbol_df['Percentual'] = 0
             
-        symbol_df['Tipo'] = symbol_df['P&L'].apply(lambda x: 'Lucro' if x > 0 else 'Prejuízo')
-        
-        # Gráfico de pizza
+        symbol_df['Tipo'] = symbol_df['P&L'].apply(lambda x: PROFIT_LABEL if x > 0 else LOSS_LABEL)
+          # Gráfico de pizza
         fig_pie = px.pie(
             symbol_df, 
-            values='P&L_Abs', 
-            names='Símbolo',
+            values=PL_ABS_COLUMN, 
+            names=SYMBOL_COLUMN,
             color='Tipo',
-            color_discrete_map={'Lucro': 'green', 'Prejuízo': 'red'},
+            color_discrete_map={PROFIT_LABEL: 'green', LOSS_LABEL: 'red'},
             title='Distribuição de P&L por Símbolo'
         )
-        
-        # Gráfico de barras
+          # Gráfico de barras
         fig_bar = px.bar(
             symbol_df.sort_values('P&L'), 
             x='P&L', 
-            y='Símbolo',
+            y=SYMBOL_COLUMN,
             color='Tipo',
-            color_discrete_map={'Lucro': 'green', 'Prejuízo': 'red'},
+            color_discrete_map={PROFIT_LABEL: 'green', LOSS_LABEL: 'red'},
             title='P&L por Símbolo',
             orientation='h'
         )
@@ -337,7 +345,7 @@ except ImportError:
 try:
     logo = Image.open('logo.png')
     st.image(logo, width=150)
-except:
+except FileNotFoundError:
     st.write("🚀 **Análise de Portfólio - by Khaio Geovan**")
 
 # Diretórios
@@ -417,7 +425,7 @@ if os.path.exists(RAW_DATA):
     
     if 'selected' not in st.session_state:
         st.session_state['selected'] = df.columns.tolist()[:5]
-        
+    
     if st.sidebar.button('Auto-seleção'):
         monthly = get_monthly_returns(returns)
         best, combo = -1, None
@@ -429,10 +437,10 @@ if os.path.exists(RAW_DATA):
         st.session_state['selected'] = list(combo)
         st.sidebar.success(f"{combo}")
         
-    selected = st.sidebar.multiselect('Selecione (3-10)', df.columns.tolist(),
+    selected = st.sidebar.multiselect('Selecione (3-20)', df.columns.tolist(),
                                       default=st.session_state['selected'])
-    if not 3<=len(selected)<=10:
-        st.warning('Selecione 3 a 10 ativos')
+    if not 3<=len(selected)<=20:
+        st.warning('Selecione 3 a 20 ativos para análise PCA')
         st.stop()
         
     df = df[selected]
@@ -447,10 +455,10 @@ if os.path.exists(RAW_DATA):
     metrics = calculate_metrics(portf_ret, initial_capital)
     
     c1,c2,c3,c4 = st.columns(4)
-    c1.metric("Retorno Total",f"{metrics['total_return']:.2%}")
+    c1.metric(TOTAL_RETURN_LABEL,f"{metrics['total_return']:.2%}")
     c2.metric("Retorno Anualizado",f"{metrics['annual_return']:.2%}")
     c3.metric("Volatilidade",f"{metrics['annual_volatility']:.2%}")
-    c4.metric("Max Drawdown",f"{metrics['max_drawdown']:.2%}")
+    c4.metric(MAX_DRAWDOWN_LABEL,f"{metrics['max_drawdown']:.2%}")
     
     st.line_chart(portf_cum, height=250)
     fig = px.scatter(x=[metrics['annual_volatility']],y=[metrics['annual_return']],
@@ -470,7 +478,7 @@ if os.path.exists(RAW_DATA):
         pca_final_value = portf_cum.iloc[-1]
 
         common_capital = min(initial_capital, mt5_init_real) if normalize else 1
-
+        
         pca_return = (pca_final_value / initial_capital) - 1
         mt5_return = mt5_profit / mt5_init_real if mt5_init_real > 0 else 0
 
@@ -480,11 +488,11 @@ if os.path.exists(RAW_DATA):
         colA, colB = st.columns(2)
         with colA:
             st.markdown("**PCA Portfolio**")
-            st.metric("Retorno Total", f"{pca_return:.2%}")
+            st.metric(TOTAL_RETURN_LABEL, f"{pca_return:.2%}")
             st.metric("Equity Final", f"R$ {pca_equity:,.2f}")
         with colB:
             st.markdown("**MT5 Report**")
-            st.metric("Retorno Total", f"{mt5_return:.2%}")
+            st.metric(TOTAL_RETURN_LABEL, f"{mt5_return:.2%}")
             st.metric("Equity Final", f"R$ {mt5_equity:,.2f}")
 
         comp_df = pd.DataFrame({
@@ -571,19 +579,17 @@ if os.path.exists(RAW_DATA):
             # Equity normalizado
             pca_equity_norm = common_capital * (1 + pca_return)
             mt5_equity_norm = common_capital * (1 + mt5_return)
-            
-            # Dashboard principal
+              # Dashboard principal
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric("**PCA - Retorno Total**", 
+                st.metric(f"**PCA - {TOTAL_RETURN_LABEL}**", 
                          f"{pca_return:.2%}",
                          delta=f"{(pca_return - mt5_return)*100:.2f}pp")
             
             with col2:
-                st.metric("**MT5 - Retorno Total**", 
-                         f"{mt5_return:.2%}",
-                         delta=f"{(mt5_return - pca_return)*100:.2f}pp")
+                st.metric(f"**MT5 - {TOTAL_RETURN_LABEL}**", 
+                         f"{mt5_return:.2%}",                         delta=f"{(mt5_return - pca_return)*100:.2f}pp")
             
             with col3:
                 st.metric("**PCA - Equity Final**", 
@@ -595,7 +601,7 @@ if os.path.exists(RAW_DATA):
 
             # Gráfico comparativo
             comp_df = pd.DataFrame({
-                'Estratégia': ['PCA Portfolio', 'MT5 Real'],
+                'Estratégia': [PCA_PORTFOLIO_LABEL, MT5_REAL_LABEL],
                 'Equity Final (R$)': [pca_equity_norm, mt5_equity_norm],
                 'Retorno (%)': [pca_return * 100, mt5_return * 100],
                 'Performance': ['PCA', 'MT5']
@@ -671,10 +677,9 @@ if os.path.exists(RAW_DATA):
                 
                 st.markdown("### 📋 Detalhamento por Símbolo")
                 st.dataframe(allocation_analysis['data'], use_container_width=True)
-                
-                # Insights automáticos
-                best_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmax(), 'Símbolo']
-                worst_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmin(), 'Símbolo']
+                  # Insights automáticos
+                best_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmax(), SYMBOL_COLUMN]
+                worst_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmin(), SYMBOL_COLUMN]
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -794,4 +799,254 @@ if os.path.exists(RAW_DATA):
         else:
             st.warning(f"⚡ **MT5 Recomendado**: Superou PCA em {performance_diff:.1f}pp. A execução manual está agregando alpha.")
 
-# ...existing code...
+    # --- Nova Seção: Divisão de Capital por Setor ---
+    st.markdown("---")
+    st.header("💰 Gestão de Capital por Setor")
+    
+    with st.expander("🔧 Configurar Alocação de Capital"):
+        st.markdown("**Defina o orçamento para cada setor de ativos:**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            acoes_budget = st.number_input('💼 Ações (R$)', min_value=0.0, value=1000.0, step=100.0)
+            forex_budget = st.number_input('💱 Forex (USD)', min_value=0.0, value=100.0, step=10.0)
+        
+        with col2:
+            cripto_budget = st.number_input('🪙 Criptomoedas (R$)', min_value=0.0, value=100.0, step=50.0)
+            etf_budget = st.number_input('📊 ETFs/Índices (R$)', min_value=0.0, value=500.0, step=100.0)
+        
+        # Configurar alocação
+        sector_budgets = {
+            'acoes': acoes_budget,
+            'forex': forex_budget,
+            'criptomoedas': cripto_budget,
+            'etfs_indices': etf_budget
+        }
+        
+        # Método de alocação dentro do setor
+        allocation_method = st.selectbox(
+            '⚖️ Método de Alocação dentro do Setor',
+            ['equal_weight', 'volatility_parity', 'momentum'],
+            format_func=lambda x: {
+                'equal_weight': 'Peso Igual',
+                'volatility_parity': 'Paridade de Volatilidade', 
+                'momentum': 'Baseado em Momentum'
+            }[x]
+        )
+        
+        if st.button('🚀 Aplicar Alocação por Setor'):
+            # Inicializar gestor de alocação
+            allocation_manager = PortfolioAllocationManager(df, returns)
+            allocation_manager.set_sector_allocation(sector_budgets)
+            
+            # Calcular pesos
+            portfolio_weights = allocation_manager.calculate_portfolio_weights(
+                selected, allocation_method
+            )
+            
+            # Mostrar alocação
+            st.subheader("📊 Visualização da Alocação")
+            
+            # Gráfico de pizza da alocação
+            fig_allocation = allocation_manager.plot_sector_allocation()
+            if fig_allocation:
+                st.plotly_chart(fig_allocation, use_container_width=True)
+              # Calcular performance por setor
+            sector_performance = allocation_manager.calculate_sector_performance(
+                selected, portfolio_weights
+            )
+            
+            if sector_performance:
+                # Comparação de performance
+                fig_comparison = allocation_manager.plot_sector_performance_comparison(sector_performance)
+                if fig_comparison:
+                    st.plotly_chart(fig_comparison, use_container_width=True)
+                
+                # Evolução temporal
+                fig_evolution = allocation_manager.plot_sector_evolution(sector_performance)
+                if fig_evolution:
+                    st.plotly_chart(fig_evolution, use_container_width=True)
+
+    # Resumo por setor (fora do expander para evitar aninhamento)
+    if 'sector_performance' in locals() and sector_performance:
+        st.subheader("📋 Resumo por Setor")
+        sector_summary = allocation_manager.get_sector_summary(sector_performance)
+        
+        # Usar colunas ao invés de expanders aninhados
+        for sector, metrics in sector_summary.items():
+            st.markdown(f"### 📊 {sector}")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Alocação", metrics['Alocação'])
+                st.metric(TOTAL_RETURN_LABEL, metrics['Retorno Total'])
+                st.metric("Retorno Anual", metrics['Retorno Anual'])
+            
+            with col2:
+                st.metric("Volatilidade", metrics['Volatilidade'])
+                st.metric("Sharpe Ratio", metrics['Sharpe Ratio'])
+                st.metric(MAX_DRAWDOWN_LABEL, metrics['Max Drawdown'])
+            
+            with col3:
+                st.write("**Ativos Incluídos:**")
+                st.write(metrics['Ativos'])
+            
+            st.markdown("---")
+
+    # --- Nova Seção: Análise PCA Avançada ---
+    st.markdown("---")
+    st.header("🔬 Análise PCA Avançada")
+    
+    with st.expander("📈 Análise Detalhada dos Componentes Principais"):
+        try:
+            # Inicializar análise PCA avançada
+            pca_advanced = PCAAdvancedAnalysis(returns)
+            
+            # Realizar análise completa
+            pca_results = pca_advanced.analyze_components()
+            
+            if pca_results:
+                st.subheader("📊 Visualizações PCA")
+                
+                # Scree Plot
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    fig_scree = pca_advanced.plot_scree()
+                    if fig_scree:
+                        st.plotly_chart(fig_scree, use_container_width=True)
+                
+                with col2:
+                    fig_loadings = pca_advanced.plot_loadings_heatmap()
+                    if fig_loadings:
+                        st.plotly_chart(fig_loadings, use_container_width=True)
+                
+                # Correlation Matrix e Biplot 3D
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    fig_corr = pca_advanced.plot_correlation_matrix()
+                    if fig_corr:
+                        st.plotly_chart(fig_corr, use_container_width=True)
+                
+                with col2:
+                    fig_3d = pca_advanced.plot_biplot_3d()
+                    if fig_3d:
+                        st.plotly_chart(fig_3d, use_container_width=True)
+                  # Interpretação dos componentes
+                st.subheader("🧠 Interpretação dos Componentes Principais")
+                interpretations = pca_advanced.interpret_components()
+                
+                for i, interpretation in enumerate(interpretations[:3], 1):
+                    st.write(f"**📊 Componente Principal {i}**")
+                    st.write(f"**Variância Explicada:** {interpretation['variance_explained']:.2%}")
+                    st.write(f"**Interpretação:** {interpretation['interpretation']}")
+                    st.write("**Principais Ativos:**")
+                    for asset, weight in interpretation['top_assets']:
+                        st.write(f"• {asset}: {weight:.3f}")
+                    st.markdown("---")
+        
+        except Exception as e:
+            st.error(f"Erro na análise PCA avançada: {str(e)}")    # --- Nova Seção: Pair Trading ---
+    st.markdown("---")
+    st.header("🔄 Análise de Pair Trading")
+    
+    with st.expander("💹 Estratégia de Pares"):
+        # Usar todos os ativos disponíveis para pair trading
+        all_assets = df.columns.tolist()
+        
+        if len(all_assets) >= 2:
+            st.info(f"📊 {len(all_assets)} ativos disponíveis para análise de pair trading")
+            
+            # Seleção de pares
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                asset1 = st.selectbox('🎯 Ativo 1', all_assets, key='pair_asset1')
+            
+            with col2:
+                available_assets = [a for a in all_assets if a != asset1]
+                asset2 = st.selectbox('🎯 Ativo 2', available_assets, key='pair_asset2')
+            
+            if st.button('🔍 Analisar Pair Trading'):
+                try:
+                    # Inicializar análise de pair trading
+                    pair_analysis = PairTradingAnalysis(df[[asset1, asset2]])
+                    
+                    # Teste de cointegração
+                    coint_result = pair_analysis.test_cointegration(asset1, asset2)
+                    
+                    st.subheader("📊 Teste de Cointegração")
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric("Estatística Cointegração", f"{coint_result['cointegration_stat']:.4f}")
+                    
+                    with col2:
+                        st.metric("P-valor", f"{coint_result['p_value']:.4f}")
+                    
+                    with col3:
+                        cointegrated = "✅ Sim" if coint_result['is_cointegrated'] else "❌ Não"
+                        st.metric("Cointegração", cointegrated)
+                    
+                    if coint_result['is_cointegrated']:
+                        st.success("🎉 Os ativos são cointegrados! Pair trading é viável.")
+                        
+                        # Gerar sinais de trading
+                        signals = pair_analysis.generate_signals()
+                        
+                        # Realizar backtesting
+                        backtest_results = pair_analysis.backtest_strategy(initial_capital=10000)
+                        
+                        # Visualizações
+                        st.subheader("📈 Visualizações da Estratégia")
+                        
+                        # Spread e sinais
+                        fig_spread = pair_analysis.plot_spread_and_signals()
+                        if fig_spread:
+                            st.plotly_chart(fig_spread, use_container_width=True)
+                          # Performance
+                        fig_performance = pair_analysis.plot_strategy_performance()
+                        if fig_performance:
+                            st.plotly_chart(fig_performance, use_container_width=True)
+                        
+                        # Métricas do backtesting
+                        st.subheader("📊 Métricas da Estratégia")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric(TOTAL_RETURN_LABEL, f"{backtest_results['total_return']:.2%}")
+                        
+                        with col2:
+                            st.metric("Sharpe Ratio", f"{backtest_results['sharpe_ratio']:.2f}")
+                        
+                        with col3:
+                            st.metric(MAX_DRAWDOWN_LABEL, f"{backtest_results['max_drawdown']:.2%}")
+                        
+                        with col4:
+                            st.metric("Número de Trades", backtest_results['num_trades'])
+                        
+                        # Análise de trades
+                        st.subheader("📋 Análise de Trades")
+                        
+                        if backtest_results['num_trades'] > 0:
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.metric("Win Rate", f"{backtest_results.get('win_rate', 0):.1%}")
+                                st.metric("Profit Factor", f"{backtest_results.get('profit_factor', 0):.2f}")
+                            
+                            with col2:
+                                st.metric("Avg. Trade Return", f"{backtest_results.get('avg_trade_return', 0):.2%}")                                
+                                st.metric("Volatilidade", f"{backtest_results.get('volatility', 0):.2%}")
+                    else:
+                        st.warning("⚠️ Os ativos não são cointegrados. Pair trading não é recomendado para este par.")
+                
+                except Exception as e:
+                    st.error(f"Erro na análise de pair trading: {str(e)}")
+        else:
+            st.warning("⚠️ É necessário ter pelo menos 2 ativos disponíveis para análise de pair trading.")
+
+else:
+    st.error("⚠️ Dados não encontrados. Execute 'Baixar dados dos ativos' primeiro.")
