@@ -1457,8 +1457,7 @@ def show_pair_trading_page():
                     st.plotly_chart(fig_corr, use_container_width=True)
                 else:
                     st.info("📊 Muitos ativos selecionados. Matriz não exibida para melhor performance.")
-        
-        # Tab 2: Análise Detalhada
+          # Tab 2: Análise Detalhada
         with pair_tabs[1]:
             st.subheader("📊 Análise Detalhada do Par")
             
@@ -1494,7 +1493,22 @@ def show_pair_trading_page():
                     # Métricas principais
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
-                        st.metric("Correlação", f"{pair_analyzer.correlation_matrix.loc[asset1, asset2]:.3f}")
+                        # Verificar se a matriz de correlação existe e se os ativos estão nela
+                        try:
+                            if (pair_analyzer.correlation_matrix is not None and 
+                                not pair_analyzer.correlation_matrix.empty and
+                                asset1 in pair_analyzer.correlation_matrix.index and
+                                asset2 in pair_analyzer.correlation_matrix.columns):
+                                correlation_value = pair_analyzer.correlation_matrix.loc[asset1, asset2]
+                                if not pd.isna(correlation_value):
+                                    st.metric("Correlação", f"{correlation_value:.3f}")
+                                else:
+                                    st.metric("Correlação", "N/A")
+                            else:
+                                st.metric("Correlação", "N/A")
+                        except Exception as e:
+                            st.metric("Correlação", "Erro")
+                            st.error(f"Erro ao calcular correlação: {str(e)}")
                     with col2:
                         status = "✅ Sim" if coint_result.get('is_cointegrated', False) else "❌ Não"
                         st.metric("Cointegrado", status)

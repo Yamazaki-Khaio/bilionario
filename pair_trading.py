@@ -36,32 +36,59 @@ class PairTradingAnalysis:
             
         Returns:
             list: Lista de pares correlacionados
-        """
-        # Verificar se temos dados suficientes
+        """        # Verificar se temos dados suficientes
         min_periods = min_years * 252  # aproximadamente 252 dias úteis por ano
         if len(self.price_data) < min_periods:
             st.warning(f"Dados insuficientes. Necessário pelo menos {min_years} anos de dados.")
             return []
         
-        # Calcular matriz de correlação
-        self.correlation_matrix = self.returns_data.corr()
+        # Verificar se temos dados de retorno válidos
+        if self.returns_data is None or self.returns_data.empty:
+            st.error("Dados de retorno inválidos ou vazios.")
+            return []
         
-        # Encontrar pares correlacionados
+        # Calcular matriz de correlação
+        try:
+            self.correlation_matrix = self.returns_data.corr()
+            
+            # Verificar se a matriz de correlação foi calculada corretamente
+            if self.correlation_matrix is None or self.correlation_matrix.empty:
+                st.error("Não foi possível calcular a matriz de correlação.")
+                return []
+                
+        except Exception as e:
+            st.error(f"Erro ao calcular matriz de correlação: {str(e)}")
+            return []
+          # Encontrar pares correlacionados
         pairs = []
         assets = self.correlation_matrix.columns
         
         for i in range(len(assets)):
             for j in range(i+1, len(assets)):
                 asset1, asset2 = assets[i], assets[j]
-                correlation = self.correlation_matrix.loc[asset1, asset2]
                 
-                if abs(correlation) >= min_correlation:
-                    pairs.append({
-                        'asset1': asset1,
-                        'asset2': asset2,
-                        'correlation': correlation,
-                        'abs_correlation': abs(correlation)
-                    })
+                try:
+                    # Verificar se os ativos existem na matriz de correlação
+                    if asset1 not in self.correlation_matrix.index or asset2 not in self.correlation_matrix.columns:
+                        continue
+                        
+                    correlation = self.correlation_matrix.loc[asset1, asset2]
+                    
+                    # Verificar se a correlação é um número válido
+                    if pd.isna(correlation) or not isinstance(correlation, (int, float)):
+                        continue
+                        
+                    if abs(correlation) >= min_correlation:
+                        pairs.append({
+                            'asset1': asset1,
+                            'asset2': asset2,
+                            'correlation': correlation,
+                            'abs_correlation': abs(correlation)
+                        })
+                        
+                except Exception as e:
+                    st.warning(f"Erro ao processar correlação entre {asset1} e {asset2}: {str(e)}")
+                    continue
         
         # Ordenar por correlação absoluta
         pairs = sorted(pairs, key=lambda x: x['abs_correlation'], reverse=True)
@@ -321,35 +348,46 @@ class PairTradingAnalysis:
             title=f"📊 Análise Completa Pair Trading: {coint_result['asset1']} vs {coint_result['asset2']}",
             height=1000,
             showlegend=True
-        )
+                )
         
         return fig
     
     def plot_correlation_heatmap(self):
         """Cria heatmap de correlação interativo"""
-        if self.correlation_matrix is None:
-            return None
+        if self.correlation_matrix is None or self.correlation_matrix.empty:
+            try:
+                self.correlation_matrix = self.returns_data.corr()
+                if self.correlation_matrix is None or self.correlation_matrix.empty:
+                    st.error("Não foi possível calcular a matriz de correlação.")
+                    return None
+            except Exception as e:
+                st.error(f"Erro ao calcular matriz de correlação: {str(e)}")
+                return None
+        
+        try:
+            fig = go.Figure(data=go.Heatmap(
+                z=self.correlation_matrix.values,
+                x=self.correlation_matrix.columns,
+                y=self.correlation_matrix.columns,
+                colorscale='RdBu',
+                zmid=0,
+                text=np.round(self.correlation_matrix.values, 2),
+                texttemplate='%{text}',
+                textfont={"size": 8},
+                hoverongaps=False            ))
             
-        fig = go.Figure(data=go.Heatmap(
-            z=self.correlation_matrix.values,
-            x=self.correlation_matrix.columns,
-            y=self.correlation_matrix.columns,
-            colorscale='RdBu',
-            zmid=0,
-            text=np.round(self.correlation_matrix.values, 2),
-            texttemplate='%{text}',
-            textfont={"size": 8},
-            hoverongaps=False
-        ))
-        
-        fig.update_layout(
-            title='🔗 Matriz de Correlação para Pair Trading',
-            height=600,
-            xaxis_title='Ativos',
-            yaxis_title='Ativos'
-        )
-        
-        return fig
+            fig.update_layout(
+                title='🔗 Matriz de Correlação para Pair Trading',
+                height=600,
+                xaxis_title='Ativos',
+                yaxis_title='Ativos'
+            )
+            
+            return fig
+            
+        except Exception as e:
+            st.error(f"Erro ao criar heatmap de correlação: {str(e)}")
+            return None
     
     def get_best_pairs(self, top_n=5):
         """
@@ -528,8 +566,7 @@ class PairTradingAnalysis:
             asset2 (str): Nome do segundo ativo
             lookback_period (int): Período de lookback em dias
             z_threshold (float): Threshold para sinais de trading
-            
-        Returns:
+              Returns:
             dict: Resultados da análise
         """
         try:
@@ -539,9 +576,29 @@ class PairTradingAnalysis:
             
             # Calcular correlação
             if self.correlation_matrix is None:
-                self.correlation_matrix = self.returns_data.corr()
+                try:
+                    self.correlation_matrix = self.returns_data.corr()
+                    if self.correlation_matrix is None or self.correlation_matrix.empty:
+                        st.error("Erro ao calcular matriz de correlação.")
+                        return None
+                except Exception as e:
+                    st.error(f"Erro ao calcular matriz de correlação: {str(e)}")
+                    return None
             
-            correlation = self.correlation_matrix.loc[asset1, asset2]
+            # Verificar se os ativos existem na matriz de correlação
+            if (asset1 not in self.correlation_matrix.index or 
+                asset2 not in self.correlation_matrix.columns):
+                st.error(f"Ativos {asset1} ou {asset2} não encontrados na matriz de correlação.")
+                return None
+            
+            try:
+                correlation = self.correlation_matrix.loc[asset1, asset2]
+                if pd.isna(correlation):
+                    st.error(f"Correlação entre {asset1} e {asset2} não disponível.")
+                    return None
+            except Exception as e:
+                st.error(f"Erro ao acessar correlação entre {asset1} e {asset2}: {str(e)}")
+                return None
             
             # Teste de cointegração
             coint_result = self.test_cointegration(asset1, asset2)
