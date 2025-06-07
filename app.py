@@ -545,8 +545,11 @@ if os.path.exists(RAW_DATA):
     if n_comp>=2:
         fig2, ax2 = plt.subplots()
         ax2.scatter(comps[:,0],comps[:,1],alpha=0.5)
+        ax2.set_xlabel('PC1')
+        ax2.set_ylabel('PC2')
+        ax2.set_title('PCA Scatter Plot')
         st.pyplot(fig2)
-
+    
     # --- Export StrategyQuant ---
     st.markdown("---")
     st.subheader("💾 Export StrategyQuant")
@@ -575,6 +578,71 @@ if os.path.exists(RAW_DATA):
         ])
         
         with tab1:
+            st.markdown("### 📈 Comparação de Performance")
+            
+            # Configurações
+            col1, col2 = st.columns(2)
+            with col1:
+                normalize_adv = st.checkbox("Normalizar capital inicial", value=True, key="normalize_advanced")
+            with col2:
+                show_detailed_metrics = st.checkbox("Mostrar métricas detalhadas", value=True)
+
+            # Extração segura de dados MT5
+            mt5_profit = mt5_data.get('net_profit', 0)
+            mt5_balance = mt5_data.get('balance', 0)
+            mt5_initial = mt5_data.get('initial_capital', mt5_balance - mt5_profit if mt5_balance > 0 else 10000)
+            
+            # Dados PCA normalizados
+            pca_final_value = portf_cum.iloc[-1]
+            common_capital = min(initial_capital, mt5_initial) if normalize_adv else initial_capital
+            
+            pca_return = (pca_final_value / initial_capital) - 1
+            mt5_return = mt5_profit / mt5_initial if mt5_initial > 0 else 0
+            
+            # Equity normalizado
+            pca_equity_norm = common_capital * (1 + pca_return)
+            mt5_equity_norm = common_capital * (1 + mt5_return)
+            
+            # Dashboard principal
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric(f"**PCA - {TOTAL_RETURN_LABEL}**", 
+                         f"{pca_return:.2%}",
+                         delta=f"{(pca_return - mt5_return)*100:.2f}pp")
+            
+            with col2:
+                st.metric(f"**MT5 - {TOTAL_RETURN_LABEL}**", 
+                         f"{mt5_return:.2%}",
+                         delta=f"{(mt5_return - pca_return)*100:.2f}pp")
+            
+            with col3:
+                st.metric("**PCA - Equity Final**", 
+                         f"R$ {pca_equity_norm:,.2f}")
+            
+            with col4:
+                st.metric("**MT5 - Equity Final**", 
+                         f"R$ {mt5_equity_norm:,.2f}")
+
+            # Gráfico comparativo
+            comp_df = pd.DataFrame({
+                'Estratégia': [PCA_PORTFOLIO_LABEL, MT5_REAL_LABEL],
+                'Equity Final (R$)': [pca_equity_norm, mt5_equity_norm],
+                'Retorno (%)': [pca_return * 100, mt5_return * 100],
+                'Performance': ['PCA', 'MT5']
+            })
+            
+            fig_comp = px.bar(comp_df, x='Estratégia', y='Equity Final (R$)',
+                             color='Performance', 
+                             title='Comparação de Equity Normalizado',
+                             color_discrete_map={'PCA': 'blue', 'MT5': 'red'})
+            st.plotly_chart(fig_comp, use_container_width=True)            # Evolução Temporal
+            st.markdown("### 📈 Evolução Temporal")
+            temporal_fig = plot_temporal_comparison(portf_ret, mt5_data, common_capital)
+            if temporal_fig:
+                st.plotly_chart(temporal_fig, use_container_width=True)
+
+        with tab2:
             st.markdown("### 📈 Comparação de Performance")
             
             # Configurações
@@ -666,7 +734,24 @@ if os.path.exists(RAW_DATA):
                         st.write(f"• Recovery Factor: {risk_metrics['mt5']['recovery_factor']:.2f}")
                         st.write(f"• Win Rate: {risk_metrics['mt5']['win_rate']:.2%}")
                         st.write(f"• Max Drawdown: {risk_metrics['mt5']['drawdown']:.2%}")
-
+        
+        with tab2:
+            st.markdown("### 🎯 Análise Multidimensional")
+            
+            risk_metrics = create_risk_metrics_analysis(metrics, mt5_data)
+            if risk_metrics:
+                radar_fig = create_performance_radar_chart(metrics, mt5_data, risk_metrics)
+                if radar_fig:
+                    st.plotly_chart(radar_fig, use_container_width=True)
+                    
+                    st.info("""
+                    **Interpretação do Gráfico Radar:**
+                    - **Retorno**: Performance de retorno normalizada
+                    - **Risco (inv)**: Inverso da volatilidade (maior valor = menor risco)
+                    - **Sharpe**: Índice de Sharpe ou Profit Factor
+                    - **Recuperação**: Capacidade de recuperação de drawdowns                    - **Consistência**: Estabilidade dos resultados
+                    """)
+        
         with tab2:
             st.markdown("### 🎯 Análise Multidimensional")
             
@@ -681,10 +766,9 @@ if os.path.exists(RAW_DATA):
                     - **Retorno**: Performance de retorno normalizada
                     - **Risco (inv)**: Inverso do risco (maior = melhor)
                     - **Sharpe**: Retorno ajustado pelo risco
-                    - **Recuperação**: Capacidade de recuperar de perdas
-                    - **Consistência**: Estabilidade da estratégia
+                    - **Recuperação**: Capacidade de recuperar de perdas                    - **Consistência**: Estabilidade da estratégia
                     """)
-
+        
         with tab3:
             st.markdown("### 📊 Análise de Alocação MT5")
             
@@ -698,7 +782,31 @@ if os.path.exists(RAW_DATA):
                 
                 st.markdown("### 📋 Detalhamento por Símbolo")
                 st.dataframe(allocation_analysis['data'], use_container_width=True)
-                  # Insights automáticos
+                
+                # Insights automáticos
+                best_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmax(), SYMBOL_COLUMN]
+                worst_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmin(), SYMBOL_COLUMN]
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.success(f"🎯 **Melhor Símbolo**: {best_symbol}")
+                with col2:
+                    st.error(f"⚠️ **Pior Símbolo**: {worst_symbol}")
+            else:
+                st.warning("Dados de símbolos não disponíveis ou inválidos no relatório MT5")
+
+        with tab4:
+            
+            allocation_analysis = create_portfolio_allocation_analysis(mt5_data)
+            if allocation_analysis:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.plotly_chart(allocation_analysis['pie'], use_container_width=True)
+                with col2:
+                    st.plotly_chart(allocation_analysis['bar'], use_container_width=True)
+                
+                st.markdown("### 📋 Detalhamento por Símbolo")
+                st.dataframe(allocation_analysis['data'], use_container_width=True)                # Insights automáticos
                 best_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmax(), SYMBOL_COLUMN]
                 worst_symbol = allocation_analysis['data'].loc[allocation_analysis['data']['P&L'].idxmin(), SYMBOL_COLUMN]
                 
@@ -878,8 +986,7 @@ if os.path.exists(RAW_DATA):
                 selected, portfolio_weights
             )
             
-            if sector_performance:
-                # Comparação de performance
+            if sector_performance:                # Comparação de performance
                 fig_comparison = allocation_manager.plot_sector_performance_comparison(sector_performance)
                 if fig_comparison:
                     st.plotly_chart(fig_comparison, use_container_width=True)
@@ -929,8 +1036,7 @@ if os.path.exists(RAW_DATA):
             
             if pca_results:
                 st.subheader("📊 Visualizações PCA")
-                
-                # Scree Plot
+                  # Scree Plot
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -942,8 +1048,7 @@ if os.path.exists(RAW_DATA):
                     fig_loadings = pca_advanced.plot_loadings_heatmap()
                     if fig_loadings:
                         st.plotly_chart(fig_loadings, use_container_width=True)
-                
-                # Correlation Matrix e Biplot 3D
+                  # Correlation Matrix e Biplot 3D
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -969,7 +1074,9 @@ if os.path.exists(RAW_DATA):
                     st.markdown("---")
         
         except Exception as e:
-            st.error(f"Erro na análise PCA avançada: {str(e)}")    # --- Nova Seção: Pair Trading ---
+            st.error(f"Erro na análise PCA avançada: {str(e)}")
+
+    # --- Nova Seção: Pair Trading ---
     st.markdown("---")
     st.header("🔄 Análise de Pair Trading")
     

@@ -8,11 +8,10 @@ TICKERS = [
     'PETR4.SA','VALE3.SA','ITUB4.SA','BBDC4.SA','ABEV3.SA',
     'BBAS3.SA','WEGE3.SA','RENT3.SA','JBSS3.SA','SUZB3.SA',
     'RADL3.SA','LREN3.SA','MGLU3.SA','VIVT3.SA','ELET3.SA',
-    'SANB11.SA','CSAN3.SA','USIM5.SA','BRDT3.SA','KLBN11.SA',
-    # ETFs e Índices
-    'BOVA11.SA','SMAL11.SA','IVVB11.SA',
-    # Mini Índice Ibovespa (WI$N via ETF)
-    'WIN2025.SA',  # Mini índice Ibovespa
+    'SANB11.SA','CSAN3.SA','USIM5.SA','GOAU4.SA','KLBN11.SA',  # Substituído BRDT3.SA por GOAU4.SA    # ETFs e Índices
+    'BOVA11.SA','SMAL11.SA','IVVB11.SA',    # Índices e Futuros
+    'EWZ',  # iShares MSCI Brazil ETF
+    '^BVSP',  # Índice Ibovespa (proxy para mini futuro WIN)
     # Criptomoedas
     'BTC-USD','ETH-USD','ADA-USD','SOL-USD','XRP-USD',
     # Forex
@@ -24,8 +23,8 @@ ASSET_CATEGORIES = {
     'acoes': ['PETR4.SA','VALE3.SA','ITUB4.SA','BBDC4.SA','ABEV3.SA',
               'BBAS3.SA','WEGE3.SA','RENT3.SA','JBSS3.SA','SUZB3.SA',
               'RADL3.SA','LREN3.SA','MGLU3.SA','VIVT3.SA','ELET3.SA',
-              'SANB11.SA','CSAN3.SA','USIM5.SA','BRDT3.SA','KLBN11.SA'],
-    'etfs_indices': ['BOVA11.SA','SMAL11.SA','IVVB11.SA','WIN2025.SA'],
+              'SANB11.SA','CSAN3.SA','USIM5.SA','GOAU4.SA','KLBN11.SA'],  # Atualizado
+    'etfs_indices': ['BOVA11.SA','SMAL11.SA','IVVB11.SA','EWZ','^BVSP'],  # Atualizado com ^BVSP (Ibovespa)
     'criptomoedas': ['BTC-USD','ETH-USD','ADA-USD','SOL-USD','XRP-USD'],
     'forex': ['USDBRL=X','EURBRL=X','JPY=X','USDJPY=X']
 }
