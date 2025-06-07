@@ -39,23 +39,34 @@ rng = np.random.default_rng(42)
 # Adicionar as funções que estão faltando
 def calculate_metrics(returns, initial_capital):
     """Calcula métricas de performance do portfolio"""
+    # Verificar se há dados suficientes
+    if len(returns) == 0:
+        return {
+            'total_return': 0.0,
+            'annual_return': 0.0,
+            'annual_volatility': 0.0,
+            'max_drawdown': 0.0
+        }
+    
     # Calcular equity curve
     equity_curve = (1 + returns).cumprod() * initial_capital
     
     # Retorno total
     total_return = (equity_curve.iloc[-1] / initial_capital) - 1
-    
-    # Retorno anualizado (assumindo 252 dias úteis)
+      # Retorno anualizado (assumindo 252 dias úteis)
     n_periods = len(returns)
-    annual_return = (1 + total_return) ** (252 / n_periods) - 1
+    if n_periods > 0:
+        annual_return = (1 + total_return) ** (252 / n_periods) - 1
+    else:
+        annual_return = 0.0
     
     # Volatilidade anualizada
-    annual_volatility = returns.std() * np.sqrt(252)
+    annual_volatility = returns.std() * np.sqrt(252) if len(returns) > 1 else 0.0
     
     # Drawdown
     running_max = equity_curve.expanding().max()
     drawdown = (equity_curve / running_max - 1)
-    max_drawdown = drawdown.min()
+    max_drawdown = drawdown.min() if len(drawdown) > 0 else 0.0
     
     return {
         'total_return': total_return,
@@ -448,9 +459,20 @@ if os.path.exists(RAW_DATA):
 
     # --- Performance PCA ---
     st.markdown("---")
-    st.subheader("🔢 Performance PCA")
-    initial_capital = st.number_input('Capital Inicial (R$)',100.0,1e7,10000.0,100.0)
+    st.subheader("🔢 Performance PCA")    initial_capital = st.number_input('Capital Inicial (R$)',100.0,1e7,10000.0,100.0)
+    
+    # Verificar se há dados válidos
+    if returns.empty or len(returns) == 0:
+        st.warning("Não há dados suficientes para calcular as métricas.")
+        st.stop()
+    
     portf_ret = returns.mean(axis=1)
+    
+    # Verificar se portf_ret não está vazio
+    if len(portf_ret) == 0:
+        st.warning("Erro no cálculo dos retornos do portfólio.")
+        st.stop()
+    
     portf_cum = (1+portf_ret).cumprod()*initial_capital
     metrics = calculate_metrics(portf_ret, initial_capital)
     
