@@ -247,9 +247,9 @@ class PairTradingAnalysis:
             rows=4, cols=1,
             subplot_titles=(
                 f"Preços Normalizados: {coint_result['asset1']} vs {coint_result['asset2']}",
-                f"Spread e Z-Score",
-                f"Sinais de Trading",
-                f"Performance da Estratégia"
+                "Spread e Z-Score",
+                "Sinais de Trading",
+                "Performance da Estratégia"
             ),
             specs=[[{"secondary_y": False}],
                    [{"secondary_y": True}],
@@ -388,3 +388,133 @@ class PairTradingAnalysis:
         scored_pairs = sorted(scored_pairs, key=lambda x: x['score'], reverse=True)
         
         return scored_pairs[:top_n]
+    
+    def plot_spread_and_signals(self, asset1=None, asset2=None, entry_threshold=2.0, exit_threshold=0.5):
+        """
+        Plota o spread e os sinais de trading para um par de ativos.
+        """
+        # Gerar sinais
+        if asset1 is None:
+            asset1 = self.price_data.columns[0]
+        if asset2 is None:
+            asset2 = self.price_data.columns[1]
+        signals = self.generate_trading_signals(self.cointegration_results[f"{asset1}_{asset2}"], entry_threshold, exit_threshold)
+        pair_key = f"{asset1}_{asset2}"
+        coint_result = self.cointegration_results.get(pair_key)
+        if coint_result is None or signals.empty:
+            st.warning(f"Dados insuficientes para plotar {asset1} vs {asset2}")
+            return None
+
+        fig = make_subplots(
+            rows=2, cols=1,
+            subplot_titles=(
+                f"Z-Score do Spread: {asset1} vs {asset2}",
+                "Spread Bruto"
+            ),
+            shared_xaxes=True
+        )
+        # Z-Score
+        fig.add_trace(go.Scatter(
+            x=signals.index, y=signals['z_score'],
+            name='Z-Score', line=dict(color='blue')
+        ), row=1, col=1)
+        # Spread
+        fig.add_trace(go.Scatter(
+            x=signals.index, y=signals['spread'],
+            name='Spread', line=dict(color='green')
+        ), row=2, col=1)
+        # Adicionar linhas de threshold
+        fig.add_hline(y=entry_threshold, line_dash="dash", line_color="red", row=1, col=1)
+        fig.add_hline(y=-entry_threshold, line_dash="dash", line_color="red", row=1, col=1)
+        fig.add_hline(y=exit_threshold, line_dash="dot", line_color="green", row=1, col=1)
+        fig.add_hline(y=-exit_threshold, line_dash="dot", line_color="green", row=1, col=1)
+        fig.add_hline(y=0, line_dash="solid", line_color="black", row=1, col=1)
+        fig.add_hline(y=0, line_dash="solid", line_color="black", row=2, col=1)
+        # Marcar sinais de compra/venda
+        buy_signals = signals[signals['signal'] == 1]
+        sell_signals = signals[signals['signal'] == -1]
+        if len(buy_signals) > 0:
+            fig.add_trace(go.Scatter(
+                x=buy_signals.index, y=buy_signals['z_score'],
+                mode='markers', name=f'Comprar {asset2}/Vender {asset1}',
+                marker=dict(color='green', size=10, symbol='triangle-up')
+            ), row=1, col=1)
+        if len(sell_signals) > 0:
+            fig.add_trace(go.Scatter(
+                x=sell_signals.index, y=sell_signals['z_score'],
+                mode='markers', name=f'Vender {asset2}/Comprar {asset1}',
+                marker=dict(color='red', size=10, symbol='triangle-down')
+            ), row=1, col=1)
+        fig.update_layout(
+            title=f"Análise de Spread e Sinais: {asset1} vs {asset2}",
+            height=700, width=900,
+            showlegend=True,
+            xaxis2_title="Data",
+            yaxis_title="Z-Score",
+            yaxis2_title="Spread"
+        )
+        return fig
+
+    def plot_strategy_performance(self, asset1=None, asset2=None):
+        """
+        Plota a performance da estratégia de pair trading para um par de ativos.
+        """
+        if asset1 is None:
+            asset1 = self.price_data.columns[0]
+        if asset2 is None:
+            asset2 = self.price_data.columns[1]
+        signals = self.generate_trading_signals(self.cointegration_results[f"{asset1}_{asset2}"])
+        pair_key = f"{asset1}_{asset2}"
+        coint_result = self.cointegration_results.get(pair_key)
+        if coint_result is None or signals.empty:
+            st.warning(f"Dados insuficientes para plotar performance de {asset1} vs {asset2}")
+            return None
+        backtest_result = self.backtest_strategy(coint_result, signals)
+        if backtest_result is None:
+            return None
+        portfolio = backtest_result['cumulative_returns']
+        price1 = coint_result['price1']
+        price2 = coint_result['price2']
+        price1_norm = price1 / price1.iloc[0]
+        price2_norm = price2 / price2.iloc[0]
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=price1_norm.index, y=price1_norm.values,
+            name=asset1, line=dict(color='blue')
+        ))
+        fig.add_trace(go.Scatter(
+            x=price2_norm.index, y=price2_norm.values,
+            name=asset2, line=dict(color='red')
+        ))
+        fig.add_trace(go.Scatter(
+            x=portfolio.index, y=portfolio.values,
+            name='Pair Trading Strategy', line=dict(color='green', width=2)
+        ))
+        # Adicionar métricas como anotações
+        annotations = [
+            f"Retorno Total: {backtest_result['total_return']:.2%}",
+            f"Sharpe Ratio: {backtest_result['sharpe_ratio']:.2f}",
+            f"Máximo Drawdown: {backtest_result['max_drawdown']:.2%}",
+            f"Número de Trades: {backtest_result['num_trades']}",
+            f"Win Rate: {backtest_result['win_rate']:.2%}"
+        ]
+        annotation_text = "<br>".join(annotations)
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=0.02, y=0.98,
+            text=annotation_text,
+            showarrow=False,
+            font=dict(size=12, color="black"),
+            bgcolor="white",
+            bordercolor="black",
+            borderwidth=1,
+            opacity=0.8
+        )
+        fig.update_layout(
+            title=f"Performance da Estratégia: {asset1} vs {asset2}",
+            height=600, width=900,
+            xaxis_title="Data",
+            yaxis_title="Retorno Normalizado (Início = 1)",
+            legend=dict(x=0.02, y=0.02, bgcolor="white")
+        )
+        return fig
