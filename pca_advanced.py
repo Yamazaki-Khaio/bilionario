@@ -56,38 +56,83 @@ class PCAAdvancedAnalysis:
         """Cria scree plot da variância explicada"""
         fig = go.Figure()
         
+        # Criar dados para o eixo x (números dos componentes)
+        x_values = list(range(1, len(self.explained_variance_ratio) + 1))
+        
         # Variância individual
-        fig.add_trace(go.Scatter(
-            x=list(range(1, len(self.explained_variance_ratio) + 1)),
-            y=self.explained_variance_ratio * 100,
-            mode='lines+markers',
+        individual_variance = self.explained_variance_ratio * 100
+        fig.add_trace(go.Bar(
+            x=x_values,
+            y=individual_variance,
             name='Variância Individual',
-            line=dict(color='blue', width=3),
-            marker=dict(size=8)
+            marker=dict(color='rgba(58, 71, 80, 0.6)'),
+            hovertemplate='<b>PC%{x}</b><br>Variância Explicada: %{y:.2f}%<extra></extra>'
         ))
         
         # Variância cumulativa
         cumulative_var = np.cumsum(self.explained_variance_ratio) * 100
         fig.add_trace(go.Scatter(
-            x=list(range(1, len(cumulative_var) + 1)),
+            x=x_values,
             y=cumulative_var,
             mode='lines+markers',
             name='Variância Cumulativa',
-            line=dict(color='red', width=3, dash='dash'),
-            marker=dict(size=8)
+            line=dict(color='#FF4B4B', width=3),
+            marker=dict(size=8),
+            hovertemplate='<b>PC%{x}</b><br>Variância Cumulativa: %{y:.2f}%<extra></extra>'
         ))
         
-        # Linha de 80% da variância
+        # Linhas de referência para facilitar interpretação
         fig.add_hline(y=80, line_dash="dot", line_color="green",
-                      annotation_text="80% da Variância")
+                      annotation_text="80% da Variância", annotation_position="top right")
+        fig.add_hline(y=90, line_dash="dot", line_color="blue",
+                      annotation_text="90% da Variância", annotation_position="top right")
+        
+        # Adicionar anotações para destacar componentes importantes
+        for idx, cumsum in enumerate(cumulative_var):
+            if cumsum >= 80 and (idx == 0 or cumulative_var[idx-1] < 80):
+                fig.add_annotation(
+                    x=idx+1, y=cumsum,
+                    text=f"PC{idx+1}: {cumsum:.1f}%",
+                    showarrow=True,
+                    arrowhead=1,
+                    arrowsize=1,
+                    arrowcolor="#00CC96",
+                    ax=-40,
+                    ay=-40
+                )
         
         fig.update_layout(
-            title='📊 Scree Plot - Variância Explicada por Componente Principal',
-            xaxis_title='Componente Principal',
-            yaxis_title='Variância Explicada (%)',
+            title={
+                'text': '📊 Análise de Componentes Principais - Variância Explicada',
+                'y':0.95,
+                'x':0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'
+            },
+            xaxis_title={
+                'text': 'Componente Principal (PC)',
+                'font': dict(size=14)
+            },
+            yaxis_title={
+                'text': 'Variância Explicada (%)',
+                'font': dict(size=14)
+            },
             hovermode='x unified',
-            height=500
+            height=500,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
+            ),
+            barmode='group',
+            bargap=0.2,
+            margin=dict(l=60, r=60, t=80, b=60)
         )
+        
+        # Adicionar barra de cores para facilitar a interpretação
+        fig.update_layout(coloraxis_showscale=True)
         
         return fig
     
