@@ -455,11 +455,10 @@ if os.path.exists(RAW_DATA):
         st.stop()
         
     df = df[selected]
-    returns = returns[selected]
-
-    # --- Performance PCA ---
+    returns = returns[selected]    # --- Performance PCA ---
     st.markdown("---")
-    st.subheader("🔢 Performance PCA")    initial_capital = st.number_input('Capital Inicial (R$)',100.0,1e7,10000.0,100.0)
+    st.subheader("🔢 Performance PCA")
+    initial_capital = st.number_input('Capital Inicial (R$)',100.0,1e7,10000.0,100.0)
     
     # Verificar se há dados válidos
     if returns.empty or len(returns) == 0:
