@@ -2318,73 +2318,216 @@ def create_portfolio_allocation_analysis(mt5_data):
 def main():
     """Função principal da aplicação"""
     
-    # CSS para responsividade mobile
+    # Detectar tema atual do Streamlit
+    st.markdown("""
+    <script>
+    // Detectar tema do Streamlit
+    function getStreamlitTheme() {
+        const rootElement = document.querySelector('.stApp');
+        if (rootElement) {
+            const computedStyle = getComputedStyle(rootElement);
+            const bgColor = computedStyle.backgroundColor;
+            // Se o background for escuro, estamos no dark mode
+            const rgb = bgColor.match(/\\d+/g);
+            if (rgb) {
+                const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
+                return brightness < 128 ? 'dark' : 'light';
+            }
+        }
+        return 'light';
+    }
+    
+    // Aplicar tema dinâmico
+    function applyTheme() {
+        const theme = getStreamlitTheme();
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+    
+    // Observar mudanças no tema
+    const observer = new MutationObserver(applyTheme);
+    observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true });
+    
+    // Aplicar tema inicial
+    setTimeout(applyTheme, 100);
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # CSS responsivo completo com suporte a tema escuro
     st.markdown("""
     <style>
-    /* Estilo para mobile responsivo */
+    :root {
+        --mobile-nav-bg-light: #ffffff;
+        --mobile-nav-bg-dark: #262730;
+        --mobile-nav-border-light: #e0e0e0;
+        --mobile-nav-border-dark: #454545;
+        --mobile-nav-text-light: #333333;
+        --mobile-nav-text-dark: #ffffff;
+        --mobile-nav-hover-light: #f8f9fa;
+        --mobile-nav-hover-dark: #3d3d3d;
+        --mobile-nav-active-light: #e3f2fd;
+        --mobile-nav-active-dark: #1e3a5f;
+        --mobile-nav-active-text-light: #1976d2;
+        --mobile-nav-active-text-dark: #4fc3f7;
+    }
+    
+    /* Estilo base para o botão de menu mobile com ícone de 3 pontos */
+    .mobile-nav-toggle {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        background: var(--mobile-nav-bg-light);
+        border: 2px solid var(--mobile-nav-border-light);
+        border-radius: 12px;
+        padding: 12px 14px;
+        cursor: pointer;
+        z-index: 1001;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: all 0.3s ease;
+        display: none;
+        min-width: 48px;
+        min-height: 48px;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    [data-theme="dark"] .mobile-nav-toggle {
+        background: var(--mobile-nav-bg-dark);
+        border-color: var(--mobile-nav-border-dark);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    .mobile-nav-toggle:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        background: var(--mobile-nav-hover-light);
+    }
+    
+    [data-theme="dark"] .mobile-nav-toggle:hover {
+        background: var(--mobile-nav-hover-dark);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    }
+    
+    .mobile-nav-toggle:active {
+        transform: scale(0.95);
+    }
+    
+    /* Ícone de 3 pontos verticais melhorado */
+    .mobile-nav-icon {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--mobile-nav-text-light);
+        line-height: 1;
+        user-select: none;
+    }
+    
+    [data-theme="dark"] .mobile-nav-icon {
+        color: var(--mobile-nav-text-dark);
+    }
+    
+    /* Menu dropdown mobile */
+    .mobile-nav-menu {
+        position: fixed;
+        top: 4.5rem;
+        right: 1rem;
+        background: var(--mobile-nav-bg-light);
+        border: 1px solid var(--mobile-nav-border-light);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        z-index: 1000;
+        min-width: 220px;
+        max-width: 280px;
+        display: none;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+    }
+    
+    [data-theme="dark"] .mobile-nav-menu {
+        background: var(--mobile-nav-bg-dark);
+        border-color: var(--mobile-nav-border-dark);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    
+    .mobile-nav-item {
+        padding: 16px 20px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-bottom: 1px solid var(--mobile-nav-border-light);
+        color: var(--mobile-nav-text-light);
+        font-weight: 500;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    [data-theme="dark"] .mobile-nav-item {
+        border-bottom-color: var(--mobile-nav-border-dark);
+        color: var(--mobile-nav-text-dark);
+    }
+    
+    .mobile-nav-item:last-child {
+        border-bottom: none;
+    }
+    
+    .mobile-nav-item:hover {
+        background-color: var(--mobile-nav-hover-light);
+        transform: translateX(4px);
+    }
+    
+    [data-theme="dark"] .mobile-nav-item:hover {
+        background-color: var(--mobile-nav-hover-dark);
+    }
+    
+    .mobile-nav-item.active {
+        background-color: var(--mobile-nav-active-light);
+        color: var(--mobile-nav-active-text-light);
+        font-weight: 600;
+        border-left: 4px solid var(--mobile-nav-active-text-light);
+    }
+    
+    [data-theme="dark"] .mobile-nav-item.active {
+        background-color: var(--mobile-nav-active-dark);
+        color: var(--mobile-nav-active-text-dark);
+        border-left-color: var(--mobile-nav-active-text-dark);
+    }
+    
+    /* Animações suaves */
+    .mobile-nav-menu {
+        animation: slideDownFade 0.3s ease-out;
+        transform-origin: top right;
+    }
+    
+    @keyframes slideDownFade {
+        from {
+            opacity: 0;
+            transform: translateY(-10px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    
+    /* Responsividade */
     @media (max-width: 768px) {
-        .sidebar .sidebar-content {
-            width: 100%;
+        /* Esconder sidebar padrão do Streamlit */
+        .css-1d391kg, .st-emotion-cache-r90ti5 {
+            width: 0 !important;
+            min-width: 0 !important;
         }
         
-        /* Esconder sidebar padrão em mobile */
-        .css-1d391kg {
-            width: 0;
+        .css-1lcbmhc, .main .block-container {
+            margin-left: 0 !important;
         }
         
-        /* Botão menu mobile */
+        /* Mostrar botão mobile */
         .mobile-nav-toggle {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background: #ffffff;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 8px 12px;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: none;
+            display: flex !important;
         }
         
-        .mobile-nav-toggle:hover {
-            background: #f0f0f0;
-            border-color: #d0d0d0;
-        }
-        
-        /* Menu dropdown mobile */
-        .mobile-nav-menu {
-            position: fixed;
-            top: 4rem;
-            right: 1rem;
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 999;
-            min-width: 200px;
-            display: none;
-        }
-        
-        .mobile-nav-item {
-            padding: 12px 16px;
-            border-bottom: 1px solid #f0f0f0;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        
-        .mobile-nav-item:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .mobile-nav-item:last-child {
-            border-bottom: none;
-        }
-        
-        .mobile-nav-item.active {
-            background-color: #e3f2fd;
-            color: #1976d2;
-            font-weight: 600;
+        /* Padding para o conteúdo principal não ficar atrás do botão */
+        .main > div {
+            padding-top: 1rem !important;
         }
     }
     
@@ -2394,35 +2537,88 @@ def main():
         }
     }
     
-    /* Melhoria do título da navegação */
+    /* Melhoria do sidebar desktop */
     .nav-title {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
         font-weight: 600;
         margin-bottom: 1rem;
-        color: #333;
+        color: var(--mobile-nav-text-light);
         display: flex;
         align-items: center;
         gap: 8px;
     }
     
-    /* Estilo dos itens de navegação */
+    [data-theme="dark"] .nav-title {
+        color: var(--mobile-nav-text-dark);
+    }
+    
+    /* Estilo melhorado para selectbox */
     .stSelectbox > div > div {
-        background-color: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 6px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
     }
     
     .stSelectbox > div > div:hover {
-        border-color: #80bdff;
-        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+        border-color: #4fc3f7;
+        box-shadow: 0 0 0 0.2rem rgba(79, 195, 247, 0.25);
+    }
+    
+    /* Ajustes para telas muito pequenas */
+    @media (max-width: 480px) {
+        .mobile-nav-menu {
+            right: 0.5rem;
+            left: 0.5rem;
+            min-width: auto;
+            max-width: none;
+        }
+        
+        .mobile-nav-toggle {
+            right: 0.5rem;
+        }
+    }
+    
+    /* Indicador visual de página atual */
+    .mobile-page-indicator {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 998;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 0.5rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: none;
+    }
+    
+    [data-theme="dark"] .mobile-page-indicator {
+        background: rgba(38, 39, 48, 0.95);
+    }
+    
+    @media (max-width: 768px) {
+        .mobile-page-indicator {
+            display: block !important;
+        }
+        
+        .main > div {
+            padding-top: 4rem !important;
+        }
+    }
+    
+    .page-indicator-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-align: center;
+        margin: 0.5rem 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     </style>
-    """, unsafe_allow_html=True)
-    
-    # Verificar se estamos em mobile através de JavaScript
-    is_mobile = st.empty()
-    
-    # Script JavaScript para detectar mobile e controlar navegação
+    """, unsafe_allow_html=True)    
+    # JavaScript para controlar a navegação mobile
     st.markdown("""
     <script>
     function isMobile() {
@@ -2431,37 +2627,76 @@ def main():
     
     function toggleMobileMenu() {
         const menu = document.querySelector('.mobile-nav-menu');
+        if (!menu) return;
+        
         const isVisible = menu.style.display === 'block';
         menu.style.display = isVisible ? 'none' : 'block';
+        
+        // Adicionar efeito de animação
+        if (!isVisible) {
+            menu.style.animation = 'slideDownFade 0.3s ease-out';
+        }
     }
     
-    // Mostrar/esconder elementos baseado no tamanho da tela
+    function selectPage(pageName) {
+        // Encontrar e atualizar o selectbox
+        const selectbox = document.querySelector('[data-testid="stSelectbox"] select');
+        if (selectbox) {
+            selectbox.value = pageName;
+            selectbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        // Fechar menu
+        const menu = document.querySelector('.mobile-nav-menu');
+        if (menu) menu.style.display = 'none';
+        
+        // Atualizar estado no Streamlit
+        window.parent.postMessage({
+            type: 'streamlit:setComponentValue',
+            value: pageName
+        }, '*');
+    }
+    
+    // Controlar visibilidade baseada no tamanho da tela
     function handleResize() {
         const toggle = document.querySelector('.mobile-nav-toggle');
+        const menu = document.querySelector('.mobile-nav-menu');
+        
         if (isMobile()) {
-            if (toggle) toggle.style.display = 'block';
+            if (toggle) toggle.style.display = 'flex';
         } else {
             if (toggle) toggle.style.display = 'none';
-            const menu = document.querySelector('.mobile-nav-menu');
             if (menu) menu.style.display = 'none';
         }
     }
     
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('load', handleResize);
-    
     // Fechar menu ao clicar fora
-    document.addEventListener('click', function(event) {
+    function handleClickOutside(event) {
         const toggle = document.querySelector('.mobile-nav-toggle');
         const menu = document.querySelector('.mobile-nav-menu');
-        if (toggle && menu && !toggle.contains(event.target) && !menu.contains(event.target)) {
+        
+        if (toggle && menu && 
+            !toggle.contains(event.target) && 
+            !menu.contains(event.target)) {
             menu.style.display = 'none';
         }
-    });
+    }
+    
+    // Event listeners
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('load', handleResize);
+    document.addEventListener('click', handleClickOutside);
+    
+    // Verificação periódica para garantir que os elementos sejam encontrados
+    function ensureElements() {
+        handleResize();
+        setTimeout(ensureElements, 1000);
+    }
+    ensureElements();
     </script>
     """, unsafe_allow_html=True)
     
-    # Navegação principal (desktop) com melhorias visuais
+    # Navegação principal (sidebar desktop)
     with st.sidebar:
         st.markdown('<div class="nav-title">🧭 Navegação</div>', unsafe_allow_html=True)
         
@@ -2482,10 +2717,10 @@ def main():
         
         st.markdown("---")
     
-    # Botão de menu mobile (3 pontos verticais)
+    # Botão de menu mobile com ícone de 3 pontos melhorado
     st.markdown("""
     <div class="mobile-nav-toggle" onclick="toggleMobileMenu()" title="Menu de navegação">
-        <span style="font-size: 1.2rem; font-weight: bold;">⋮</span>
+        <div class="mobile-nav-icon">⋮</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -2504,136 +2739,23 @@ def main():
     <div class="mobile-nav-menu">
         {mobile_menu_items}
     </div>
-    
-    <script>
-    function selectPage(pageName) {{
-        // Simular seleção da página
-        const selectbox = document.querySelector('[data-testid="stSelectbox"] select');
-        if (selectbox) {{
-            selectbox.value = pageName;
-            selectbox.dispatchEvent(new Event('change', {{ bubbles: true }}));
-        }}
-        
-        // Fechar menu
-        document.querySelector('.mobile-nav-menu').style.display = 'none';
-        
-        // Atualizar Streamlit
-        window.parent.postMessage({{
-            type: 'streamlit:setComponentValue',
-            value: pageName
-        }}, '*');
-    }}
-    </script>
     """, unsafe_allow_html=True)
-      # Carregar dados MT5 e armazenar no session_state
-    mt5_data = load_mt5_data()
-    if mt5_data:
-        st.session_state['mt5_data'] = mt5_data
     
     # Indicador visual da página atual no mobile
     if 'main_nav' in st.session_state:
         current_page_title = st.session_state['main_nav']
         st.markdown(f"""
-        <div style="display: none;" class="mobile-page-indicator">
-            <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
-                        color: white; padding: 8px 16px; border-radius: 20px; 
-                        font-size: 0.9rem; font-weight: 500; text-align: center;
-                        margin: 0.5rem 1rem;">
+        <div class="mobile-page-indicator">
+            <div class="page-indicator-badge">
                 📍 {current_page_title}
             </div>
         </div>
-        
-        <style>
-        @media (max-width: 768px) {{
-            .mobile-page-indicator {{
-                display: block !important;
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                z-index: 998;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(10px);
-                padding: 0.5rem 0;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }}
-            
-            .main > div {{
-                padding-top: 4rem !important;
-            }}
-        }}
-        </style>
         """, unsafe_allow_html=True)
     
-    # Adicionar animações suaves e melhorias na UX
-    st.markdown("""
-    <style>
-    /* Animações suaves */
-    .mobile-nav-menu {
-        animation: slideDown 0.3s ease-out;
-        transform-origin: top right;
-    }
-    
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px) scale(0.95);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-    }
-    
-    .mobile-nav-toggle {
-        transition: all 0.2s ease;
-    }
-    
-    .mobile-nav-toggle:active {
-        transform: scale(0.95);
-    }
-    
-    /* Melhor feedback visual */
-    .mobile-nav-item {
-        transition: all 0.2s ease;
-        font-weight: 500;
-    }
-    
-    .mobile-nav-item:active {
-        transform: scale(0.98);
-        background-color: #e0e0e0 !important;
-    }
-    
-    /* Responsividade aprimorada para tablets */
-    @media (max-width: 1024px) and (min-width: 769px) {
-        .css-1d391kg {
-            width: 280px !important;
-        }
-        
-        .css-1lcbmhc {
-            margin-left: 280px !important;
-        }
-    }
-    
-    /* Ajuste fino para telas muito pequenas */
-    @media (max-width: 480px) {
-        .mobile-nav-menu {
-            right: 0.5rem;
-            left: 0.5rem;
-            min-width: auto;
-        }
-        
-        .mobile-nav-toggle {
-            right: 0.5rem;
-        }
-        
-        .mobile-page-indicator div {
-            margin: 0.5rem;
-            font-size: 0.8rem;
-        }
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    # Carregar dados MT5 e armazenar no session_state
+    mt5_data = load_mt5_data()
+    if mt5_data:
+        st.session_state['mt5_data'] = mt5_data
     
     # Roteamento das páginas
     if page == "🏠 Home":
