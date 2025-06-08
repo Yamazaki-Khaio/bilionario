@@ -2318,11 +2318,154 @@ def create_portfolio_allocation_analysis(mt5_data):
 def main():
     """Função principal da aplicação"""
     
-    # Sistema de navegação por sidebar
-    st.sidebar.title("🧭 Navegação")
-    page = st.sidebar.selectbox(
-        "Escolha a seção:",
-        [
+    # CSS para responsividade mobile
+    st.markdown("""
+    <style>
+    /* Estilo para mobile responsivo */
+    @media (max-width: 768px) {
+        .sidebar .sidebar-content {
+            width: 100%;
+        }
+        
+        /* Esconder sidebar padrão em mobile */
+        .css-1d391kg {
+            width: 0;
+        }
+        
+        /* Botão menu mobile */
+        .mobile-nav-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: #ffffff;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .mobile-nav-toggle:hover {
+            background: #f0f0f0;
+            border-color: #d0d0d0;
+        }
+        
+        /* Menu dropdown mobile */
+        .mobile-nav-menu {
+            position: fixed;
+            top: 4rem;
+            right: 1rem;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 999;
+            min-width: 200px;
+            display: none;
+        }
+        
+        .mobile-nav-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .mobile-nav-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .mobile-nav-item:last-child {
+            border-bottom: none;
+        }
+        
+        .mobile-nav-item.active {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            font-weight: 600;
+        }
+    }
+    
+    @media (min-width: 769px) {
+        .mobile-nav-toggle, .mobile-nav-menu {
+            display: none !important;
+        }
+    }
+    
+    /* Melhoria do título da navegação */
+    .nav-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Estilo dos itens de navegação */
+    .stSelectbox > div > div {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+    }
+    
+    .stSelectbox > div > div:hover {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Verificar se estamos em mobile através de JavaScript
+    is_mobile = st.empty()
+    
+    # Script JavaScript para detectar mobile e controlar navegação
+    st.markdown("""
+    <script>
+    function isMobile() {
+        return window.innerWidth <= 768;
+    }
+    
+    function toggleMobileMenu() {
+        const menu = document.querySelector('.mobile-nav-menu');
+        const isVisible = menu.style.display === 'block';
+        menu.style.display = isVisible ? 'none' : 'block';
+    }
+    
+    // Mostrar/esconder elementos baseado no tamanho da tela
+    function handleResize() {
+        const toggle = document.querySelector('.mobile-nav-toggle');
+        if (isMobile()) {
+            if (toggle) toggle.style.display = 'block';
+        } else {
+            if (toggle) toggle.style.display = 'none';
+            const menu = document.querySelector('.mobile-nav-menu');
+            if (menu) menu.style.display = 'none';
+        }
+    }
+    
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('load', handleResize);
+    
+    // Fechar menu ao clicar fora
+    document.addEventListener('click', function(event) {
+        const toggle = document.querySelector('.mobile-nav-toggle');
+        const menu = document.querySelector('.mobile-nav-menu');
+        if (toggle && menu && !toggle.contains(event.target) && !menu.contains(event.target)) {
+            menu.style.display = 'none';
+        }
+    });
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # Navegação principal (desktop) com melhorias visuais
+    with st.sidebar:
+        st.markdown('<div class="nav-title">🧭 Navegação</div>', unsafe_allow_html=True)
+        
+        page_options = [
             "🏠 Home",
             "📊 Performance PCA", 
             "⚖️ Comparação MT5",
@@ -2330,14 +2473,167 @@ def main():
             "🔬 PCA Avançado", 
             "🔄 Pair Trading"
         ]
-    )
+        
+        page = st.selectbox(
+            "Escolha a seção:",
+            page_options,
+            key="main_nav"
+        )
+        
+        st.markdown("---")
     
-    st.sidebar.markdown("---")
+    # Botão de menu mobile (3 pontos verticais)
+    st.markdown("""
+    <div class="mobile-nav-toggle" onclick="toggleMobileMenu()" title="Menu de navegação">
+        <span style="font-size: 1.2rem; font-weight: bold;">⋮</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Carregar dados MT5 e armazenar no session_state
+    # Menu dropdown mobile
+    current_page = st.session_state.get('main_nav', '🏠 Home')
+    mobile_menu_items = ""
+    for option in page_options:
+        active_class = "active" if option == current_page else ""
+        mobile_menu_items += f'''
+            <div class="mobile-nav-item {active_class}" onclick="selectPage('{option}')">
+                {option}
+            </div>
+        '''
+    
+    st.markdown(f"""
+    <div class="mobile-nav-menu">
+        {mobile_menu_items}
+    </div>
+    
+    <script>
+    function selectPage(pageName) {{
+        // Simular seleção da página
+        const selectbox = document.querySelector('[data-testid="stSelectbox"] select');
+        if (selectbox) {{
+            selectbox.value = pageName;
+            selectbox.dispatchEvent(new Event('change', {{ bubbles: true }}));
+        }}
+        
+        // Fechar menu
+        document.querySelector('.mobile-nav-menu').style.display = 'none';
+        
+        // Atualizar Streamlit
+        window.parent.postMessage({{
+            type: 'streamlit:setComponentValue',
+            value: pageName
+        }}, '*');
+    }}
+    </script>
+    """, unsafe_allow_html=True)
+      # Carregar dados MT5 e armazenar no session_state
     mt5_data = load_mt5_data()
     if mt5_data:
         st.session_state['mt5_data'] = mt5_data
+    
+    # Indicador visual da página atual no mobile
+    if 'main_nav' in st.session_state:
+        current_page_title = st.session_state['main_nav']
+        st.markdown(f"""
+        <div style="display: none;" class="mobile-page-indicator">
+            <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                        color: white; padding: 8px 16px; border-radius: 20px; 
+                        font-size: 0.9rem; font-weight: 500; text-align: center;
+                        margin: 0.5rem 1rem;">
+                📍 {current_page_title}
+            </div>
+        </div>
+        
+        <style>
+        @media (max-width: 768px) {{
+            .mobile-page-indicator {{
+                display: block !important;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 998;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                padding: 0.5rem 0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            
+            .main > div {{
+                padding-top: 4rem !important;
+            }}
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+    
+    # Adicionar animações suaves e melhorias na UX
+    st.markdown("""
+    <style>
+    /* Animações suaves */
+    .mobile-nav-menu {
+        animation: slideDown 0.3s ease-out;
+        transform-origin: top right;
+    }
+    
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    
+    .mobile-nav-toggle {
+        transition: all 0.2s ease;
+    }
+    
+    .mobile-nav-toggle:active {
+        transform: scale(0.95);
+    }
+    
+    /* Melhor feedback visual */
+    .mobile-nav-item {
+        transition: all 0.2s ease;
+        font-weight: 500;
+    }
+    
+    .mobile-nav-item:active {
+        transform: scale(0.98);
+        background-color: #e0e0e0 !important;
+    }
+    
+    /* Responsividade aprimorada para tablets */
+    @media (max-width: 1024px) and (min-width: 769px) {
+        .css-1d391kg {
+            width: 280px !important;
+        }
+        
+        .css-1lcbmhc {
+            margin-left: 280px !important;
+        }
+    }
+    
+    /* Ajuste fino para telas muito pequenas */
+    @media (max-width: 480px) {
+        .mobile-nav-menu {
+            right: 0.5rem;
+            left: 0.5rem;
+            min-width: auto;
+        }
+        
+        .mobile-nav-toggle {
+            right: 0.5rem;
+        }
+        
+        .mobile-page-indicator div {
+            margin: 0.5rem;
+            font-size: 0.8rem;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Roteamento das páginas
     if page == "🏠 Home":
