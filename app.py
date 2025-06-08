@@ -41,7 +41,7 @@ st.set_page_config(
     page_title="💰 Análise Bilionário",
     page_icon="💰",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # =====================================================================
@@ -2351,8 +2351,7 @@ def main():
     setTimeout(applyTheme, 100);
     </script>
     """, unsafe_allow_html=True)
-    
-    # CSS responsivo completo com suporte a tema escuro
+      # CSS responsivo completo com suporte a tema escuro
     st.markdown("""
     <style>
     :root {
@@ -2370,6 +2369,34 @@ def main():
         --mobile-nav-active-text-dark: #4fc3f7;
     }
     
+    /* Forçar ocultação do sidebar em mobile - seletores mais específicos */
+    @media (max-width: 768px) {
+        /* Seletores para diferentes versões do Streamlit */
+        .css-1d391kg, 
+        .st-emotion-cache-r90ti5,
+        section[data-testid="stSidebar"],
+        .stSidebar,
+        div[data-testid="stSidebar"] {
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            overflow: hidden !important;
+            transform: translateX(-100%) !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+        }
+        
+        /* Ajustar conteúdo principal */
+        .css-1lcbmhc, 
+        .main .block-container,
+        .st-emotion-cache-1y4p8pa,
+        .main {
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+            width: 100% !important;
+        }
+    }
+    
     /* Estilo base para o botão de menu mobile com ícone de 3 pontos */
     .mobile-nav-toggle {
         position: fixed;
@@ -2378,14 +2405,14 @@ def main():
         background: var(--mobile-nav-bg-light);
         border: 2px solid var(--mobile-nav-border-light);
         border-radius: 12px;
-        padding: 12px 14px;
+        padding: 14px 16px;
         cursor: pointer;
         z-index: 1001;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         transition: all 0.3s ease;
         display: none;
-        min-width: 48px;
-        min-height: 48px;
+        min-width: 52px;
+        min-height: 52px;
         justify-content: center;
         align-items: center;
     }
@@ -2394,8 +2421,7 @@ def main():
         background: var(--mobile-nav-bg-dark);
         border-color: var(--mobile-nav-border-dark);
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    
+    }    
     .mobile-nav-toggle:hover {
         transform: scale(1.05);
         box-shadow: 0 6px 16px rgba(0,0,0,0.2);
@@ -2413,15 +2439,17 @@ def main():
     
     /* Ícone de 3 pontos verticais melhorado */
     .mobile-nav-icon {
-        font-size: 1.5rem;
-        font-weight: bold;
+        font-size: 1.8rem;
+        font-weight: 900;
         color: var(--mobile-nav-text-light);
         line-height: 1;
         user-select: none;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
     [data-theme="dark"] .mobile-nav-icon {
         color: var(--mobile-nav-text-dark);
+        text-shadow: 0 1px 2px rgba(255,255,255,0.1);
     }
     
     /* Menu dropdown mobile */
@@ -2506,18 +2534,37 @@ def main():
             opacity: 1;
             transform: translateY(0) scale(1);
         }
-    }
-    
+    }    
     /* Responsividade */
     @media (max-width: 768px) {
-        /* Esconder sidebar padrão do Streamlit */
-        .css-1d391kg, .st-emotion-cache-r90ti5 {
+        /* Esconder sidebar padrão do Streamlit - seletores mais abrangentes */
+        .css-1d391kg, 
+        .st-emotion-cache-r90ti5,
+        section[data-testid="stSidebar"],
+        .stSidebar,
+        div[data-testid="stSidebar"],
+        .css-1lcbmhc .css-1d391kg,
+        .block-container .css-1d391kg {
             width: 0 !important;
             min-width: 0 !important;
+            max-width: 0 !important;
+            overflow: hidden !important;
+            transform: translateX(-100%) !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            display: none !important;
         }
         
-        .css-1lcbmhc, .main .block-container {
+        /* Ajustar conteúdo principal */
+        .css-1lcbmhc, 
+        .main .block-container,
+        .st-emotion-cache-1y4p8pa,
+        .main,
+        .block-container {
             margin-left: 0 !important;
+            padding-left: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
         }
         
         /* Mostrar botão mobile */
@@ -2617,8 +2664,7 @@ def main():
         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     </style>
-    """, unsafe_allow_html=True)    
-    # JavaScript para controlar a navegação mobile
+    """, unsafe_allow_html=True)      # JavaScript para controlar a navegação mobile
     st.markdown("""
     <script>
     function isMobile() {
@@ -2657,6 +2703,56 @@ def main():
         }, '*');
     }
     
+    // Função para forçar ocultação do sidebar em mobile
+    function forceSidebarHide() {
+        if (isMobile()) {
+            const sidebarSelectors = [
+                '.css-1d391kg',
+                '.st-emotion-cache-r90ti5',
+                'section[data-testid="stSidebar"]',
+                '.stSidebar',
+                'div[data-testid="stSidebar"]'
+            ];
+            
+            sidebarSelectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(element => {
+                    element.style.cssText = `
+                        width: 0 !important;
+                        min-width: 0 !important;
+                        max-width: 0 !important;
+                        overflow: hidden !important;
+                        transform: translateX(-100%) !important;
+                        opacity: 0 !important;
+                        visibility: hidden !important;
+                        display: none !important;
+                    `;
+                });
+            });
+            
+            // Ajustar conteúdo principal
+            const contentSelectors = [
+                '.css-1lcbmhc',
+                '.main .block-container',
+                '.st-emotion-cache-1y4p8pa',
+                '.main',
+                '.block-container'
+            ];
+            
+            contentSelectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(element => {
+                    element.style.cssText += `
+                        margin-left: 0 !important;
+                        padding-left: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                    `;
+                });
+            });
+        }
+    }
+    
     // Controlar visibilidade baseada no tamanho da tela
     function handleResize() {
         const toggle = document.querySelector('.mobile-nav-toggle');
@@ -2664,6 +2760,7 @@ def main():
         
         if (isMobile()) {
             if (toggle) toggle.style.display = 'flex';
+            forceSidebarHide();
         } else {
             if (toggle) toggle.style.display = 'none';
             if (menu) menu.style.display = 'none';
@@ -2690,9 +2787,23 @@ def main():
     // Verificação periódica para garantir que os elementos sejam encontrados
     function ensureElements() {
         handleResize();
-        setTimeout(ensureElements, 1000);
+        forceSidebarHide();
+        setTimeout(ensureElements, 500);
     }
     ensureElements();
+    
+    // Observer para mudanças no DOM
+    const observer = new MutationObserver(function(mutations) {
+        if (isMobile()) {
+            forceSidebarHide();
+        }
+    });
+    
+    observer.observe(document.body, { 
+        childList: true, 
+        subtree: true,
+        attributes: true
+    });
     </script>
     """, unsafe_allow_html=True)
     
@@ -2715,8 +2826,7 @@ def main():
             key="main_nav"
         )
         
-        st.markdown("---")
-    
+        st.markdown("---")    
     # Botão de menu mobile com ícone de 3 pontos melhorado
     st.markdown("""
     <div class="mobile-nav-toggle" onclick="toggleMobileMenu()" title="Menu de navegação">
