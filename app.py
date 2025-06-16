@@ -55,6 +55,7 @@ from app_helpers import (
     create_risk_metrics_analysis, create_performance_radar_chart,
     create_portfolio_allocation_analysis
 )
+from pdf_export_helpers import create_download_button, generate_complete_statistical_analysis_pdf
 
 # =====================================================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -892,12 +893,65 @@ def show_statistical_analysis_page():
         # Tab 4: Pair Trading Avançado usando helper
         from statistical_analysis_helpers import advanced_pair_trading_tab
         with stat_tabs[3]:
-            advanced_pair_trading_tab(df)
-        
-        # Tab 5: Documentação usando helper
+            advanced_pair_trading_tab(df)          # Tab 5: Documentação usando helper
         from statistical_analysis_helpers import documentation_tab
         with stat_tabs[4]:
             documentation_tab()
+          # Adicionar botão para download da análise estatística em PDF
+        st.sidebar.markdown("### 📥 Download da Análise")
+        st.sidebar.markdown("Baixe a análise estatística completa em formato PDF")
+        
+        # Determinar qual ativo está selecionado atualmente - usando Session State
+        if 'selected_asset_for_pdf' not in st.session_state:
+            # Tentar obter um ativo disponível da lista de colunas do dataframe
+            if df is not None and not df.empty:
+                assets_list = df.columns.tolist()
+                if PETR4_SYMBOL in assets_list:
+                    st.session_state['selected_asset_for_pdf'] = PETR4_SYMBOL
+                elif len(assets_list) > 0:
+                    st.session_state['selected_asset_for_pdf'] = assets_list[0]
+                else:
+                    st.session_state['selected_asset_for_pdf'] = "ATIVO"
+            else:
+                st.session_state['selected_asset_for_pdf'] = "ATIVO"
+        
+        # Permitir ao usuário selecionar um ativo específico para o PDF
+        available_assets = [col for col in df.columns if df[col].dtype in ['float64', 'int64']] if not df.empty else []
+        st.sidebar.selectbox("Ativo para o PDF:", available_assets, 
+                            key="selected_asset_for_pdf",
+                            index=0 if not available_assets or PETR4_SYMBOL not in available_assets else available_assets.index(PETR4_SYMBOL))
+        
+        if st.sidebar.button("📄 Download PDF da Análise Estatística", type="primary"):
+            # Código para gerar o PDF completo com dados reais e visualizações
+            with st.spinner("Gerando PDF da análise estatística com gráficos e dados..."):
+                try:
+                    import base64
+                    from pdf_export_helpers import generate_complete_statistical_analysis_pdf
+                    
+                    # Usar o ativo selecionado do session_state
+                    selected_asset = st.session_state.get('selected_asset_for_pdf')
+                      # Gerar PDF com dados reais e visualizações
+                    pdf_data = generate_complete_statistical_analysis_pdf(df, selected_asset)                    # Criar botão de download usando a função auxiliar
+                    # Garantir que selected_asset é string e não é None antes de usar replace()
+                    if selected_asset is None:
+                        file_suffix = 'geral'
+                    else:
+                        # Converter para string e substituir pontos por underscores
+                        try:
+                            file_suffix = str(selected_asset).replace('.', '_')
+                        except:
+                            file_suffix = 'geral'
+                            
+                    download_button_html = create_download_button(
+                        pdf_data,
+                        filename=f"analise_estatistica_{file_suffix}.pdf", 
+                        button_text="Baixar Análise Estatística Completa (PDF)"
+                    )
+                    
+                    st.sidebar.markdown(download_button_html, unsafe_allow_html=True)
+                    st.sidebar.success("PDF gerado com sucesso! Clique no botão acima para baixar.")
+                except Exception as pdf_error:
+                    st.sidebar.error(f"Erro ao gerar PDF: {pdf_error}")
     
     except Exception as e:
         st.error(f"❌ Erro ao carregar dados: {str(e)}")

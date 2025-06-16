@@ -17,38 +17,8 @@ from scipy.stats import skew, kurtosis
 from plotly.subplots import make_subplots
 from constants import PETR4_SYMBOL
 import statsmodels.api as sm
-# Importar funções de interpretação de risco
-try:
-    from risk_utils import _display_risk_interpretation, _calculate_risk_score, _get_risk_category
-except ImportError:
-    # Funções de fallback caso o módulo risk_utils não exista
-    def _display_risk_interpretation(risk_metrics):
-        """Versão simplificada para exibir interpretação de risco"""
-        st.subheader("💡 Interpretação dos Resultados de Risco")
-        st.write("Para interpretação completa dos resultados, certifique-se que o módulo risk_utils está disponível.")
-        
-        # Obter valores das métricas principais
-        var_95 = risk_metrics.get('var_cvar', {}).get('var_95', 0)
-        cvar_95 = risk_metrics.get('var_cvar', {}).get('cvar_95', 0)
-        
-        st.info(f"""
-        ** Métricas Principais:**
-        - VaR 95%: {var_95:.2%} (em 95% dos casos, a perda não será maior)
-        - CVaR 95%: {cvar_95:.2%} (perda média nos 5% piores casos)
-        """)
-        
-    def _calculate_risk_score(var_95, cvar_95, max_dd, vol_anual):
-        """Versão simplificada para cálculo de score de risco"""
-        return (abs(var_95) * 30 + abs(cvar_95) * 40 + abs(max_dd) * 15 + vol_anual * 15) / 10
-    
-    def _get_risk_category(risk_score):
-        """Versão simplificada para categorização de risco"""
-        if risk_score <= 1.5:
-            level = "BAIXO"
-        elif risk_score <= 3.0:
-            level = "MODERADO"
-        else:
-            level = "ALTO"
+# Importar funções de interpretação de risco diretamente do módulo risk_utils.py
+from risk_utils import _display_risk_interpretation, _calculate_risk_score, _get_risk_category
 
 
 def validate_data_for_operations(data, operation_name="estatística", min_samples=30, check_columns=None):
@@ -309,16 +279,23 @@ def _setup_extreme_analysis_config(available_assets):
 
 
 def _execute_extreme_analysis(stat_analyzer, selected_asset, threshold):
-    """Executa análise de extremos"""
-    with st.spinner("Analisando distribuições e extremos..."):
-        try:
-            # Verificar se o método extreme_analysis_any_asset existe
-            if hasattr(stat_analyzer, 'extreme_analysis_any_asset'):
-                extreme_analysis = stat_analyzer.extreme_analysis_any_asset(
-                    asset_symbol=selected_asset, 
-                    threshold=threshold
-                )
-            else:
+    """Executa análise de extremos usando o módulo especializado"""
+    # Importar o módulo de análise de extremos
+    try:
+        from extreme_analysis import execute_extreme_analysis
+        # Usar a função do módulo especializado
+        execute_extreme_analysis(stat_analyzer, selected_asset, threshold)
+    except ImportError:
+        # Fallback para a implementação anterior se o módulo não estiver disponível
+        with st.spinner("Analisando distribuições e extremos..."):
+            try:
+                # Verificar se o método extreme_analysis_any_asset existe
+                if hasattr(stat_analyzer, 'extreme_analysis_any_asset'):
+                    extreme_analysis = stat_analyzer.extreme_analysis_any_asset(
+                        asset_symbol=selected_asset, 
+                        threshold=threshold
+                    )
+                else:
                     # Cria resultado similar ao esperado
                     asset_returns = stat_analyzer.returns[selected_asset].dropna()
                     extreme_falls = asset_returns[asset_returns <= -threshold]
@@ -335,13 +312,15 @@ def _execute_extreme_analysis(stat_analyzer, selected_asset, threshold):
                             'max': asset_returns.max()
                         }
                     }
-            
-            if 'error' not in extreme_analysis:
-                _display_extreme_analysis_results(extreme_analysis, selected_asset, threshold)
-            else:
-                st.error(extreme_analysis['error'])
-        except Exception as e:
-            st.error(f"Erro na análise: {str(e)}")
+                
+                if 'error' not in extreme_analysis:
+                    _display_extreme_analysis_results(extreme_analysis, selected_asset, threshold)
+                else:
+                    st.error(extreme_analysis['error'])
+            except Exception as e:
+                st.error(f"Erro na análise: {str(e)}")
+                import traceback
+                st.error(f"Detalhes: {traceback.format_exc()}")
 
 
 def _display_extreme_analysis_results(extreme_analysis, selected_asset, threshold):
@@ -1167,7 +1146,6 @@ def _execute_risk_analysis(stat_analyzer, df, selected_asset, confidence_level, 
             
             # Visualizações
             _display_distribution_comparison_plots(returns, selected_asset)
-            
             # Preparar dados para interpretação de risco
             risk_metrics_for_interp = {
                 'var_cvar': {
@@ -1182,15 +1160,10 @@ def _execute_risk_analysis(stat_analyzer, df, selected_asset, confidence_level, 
                 'risk_metrics': {
                     'max_drawdown': max_drawdown
                 }
-            }
-            
-            # Exibir interpretação de risco
+            }  
+              # Exibir interpretação de risco usando a função importada de risk_utils.py
             _display_risk_interpretation(risk_metrics_for_interp)
-              
-            # Análise de eventos extremos
-            if show_petr4_analysis and selected_asset == PETR4_SYMBOL:
-                _display_asset_extreme_analysis(stat_analyzer, df)
-                
+            
         except Exception as e:
             st.error(f"Erro na análise: {str(e)}")
             import traceback
@@ -1260,9 +1233,6 @@ def _display_risk_analysis_results(selected_asset, risk_metrics):
             kurt_desc = "Caudas Leves"
             
         st.metric("Curtose", f"{risk_metrics['kurtosis']:.2f}", kurt_desc)
-    
-    # Interpretação dos resultados
-    _display_risk_interpretation(risk_metrics)
 
 
 def _display_distribution_comparison_plots(returns, selected_asset):
@@ -1325,35 +1295,38 @@ def _display_distribution_comparison_plots(returns, selected_asset):
     
     # QQ Plot
     qq_fig = make_subplots(rows=1, cols=2, subplot_titles=["QQ Plot (Normal)", "QQ Plot (t-Student)"])
-    
-    # QQ Plot para distribuição normal
+      # QQ Plot para distribuição normal
     theoretical_quantiles, ordered_values = stats.probplot(returns, dist='norm', fit=False)
+    
     qq_fig.add_trace(
         go.Scatter(
             x=theoretical_quantiles,
             y=ordered_values,
             mode='markers',
-            name='Dados',
-            marker=dict(size=4)
+            name='Dados Observados',
+            marker=dict(
+                size=5,
+                color='rgba(0, 0, 255, 0.7)',
+                line=dict(width=1, color='rgba(0, 0, 255, 1)')
+            )
         ),
         row=1, col=1
     )
-    
-    # Linha de referência (y=x)
+      # Linha de referência (y=x)
     min_val = min(theoretical_quantiles)
     max_val = max(theoretical_quantiles)
+    
     qq_fig.add_trace(
         go.Scatter(
             x=[min_val, max_val],
             y=[min_val, max_val],
             mode='lines',
-            name='Referência',
-            line=dict(color='red', dash='dash')
+            name='Linha de Referência',
+            line=dict(color='red', width=2, dash='dash')
         ),
         row=1, col=1
     )
-    
-    # QQ Plot para t-student
+      # QQ Plot para t-student
     t_quantiles = stats.t.ppf(np.linspace(0.01, 0.99, len(returns)), df_param)
     t_quantiles = (t_quantiles - t_quantiles.mean()) / t_quantiles.std() * returns.std() + returns.mean()
     
@@ -1362,125 +1335,53 @@ def _display_distribution_comparison_plots(returns, selected_asset):
             x=t_quantiles,
             y=np.sort(returns),
             mode='markers',
-            name='Dados',
-            marker=dict(size=4)
+            name='Dados Observados',
+            marker=dict(
+                size=5,
+                color='rgba(0, 100, 80, 0.7)',
+                line=dict(width=1, color='rgba(0, 100, 80, 1)')
+            )
         ),
         row=1, col=2
     )
-    
-    # Linha de referência para t-student
+      # Linha de referência para t-student
     min_t = min(t_quantiles)
     max_t = max(t_quantiles)
+    
     qq_fig.add_trace(
         go.Scatter(
             x=[min_t, max_t],
             y=[min(returns), max(returns)],
             mode='lines',
-            name='Referência',
-            line=dict(color='red', dash='dash')
-        ),
+            name='Linha de Referência',
+            line=dict(color='red', width=2, dash='dash')        ),
         row=1, col=2
     )
     
+    # Melhorando a aparência visual dos gráficos
     qq_fig.update_layout(
-        height=400,
-        title_text="QQ Plots - Avaliação da Normalidade"
+        height=500,  # Aumentamos a altura para melhor visualização
+        title_text="QQ Plots - Avaliação da Normalidade",
+        title_font=dict(size=18),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        template="plotly_white",  # Tema mais limpo
+        margin=dict(l=50, r=50, t=80, b=50)
     )
     
+    # Adicionando títulos aos subplots
+    qq_fig.update_xaxes(title_text="Quantis Teóricos Normal", row=1, col=1)
+    qq_fig.update_yaxes(title_text="Quantis Observados", row=1, col=1)
+    qq_fig.update_xaxes(title_text="Quantis Teóricos t-Student", row=1, col=2)
+    qq_fig.update_yaxes(title_text="Quantis Observados", row=1, col=2)
+    
+    # Exibindo o gráfico aprimorado
     st.plotly_chart(qq_fig, use_container_width=True)
-
-
-def _display_risk_interpretation(risk_metrics):
-    """Exibe interpretação dos resultados da análise de risco"""
-    st.subheader("💡 Interpretação dos Resultados de Risco")
-    
-    # Obter valores das métricas principais
-    var_95 = risk_metrics.get('var_cvar', {}).get('var_95', 0)
-    var_99 = risk_metrics.get('var_cvar', {}).get('var_99', 0)
-    cvar_95 = risk_metrics.get('var_cvar', {}).get('cvar_95', 0)
-    
-    # Métricas adicionais
-    max_dd = risk_metrics.get('risk_metrics', {}).get('max_drawdown', 0)
-    vol_anual = risk_metrics.get('volatility_analysis', {}).get('current_vol_annual', 0)
-    
-    # Criar tabela de interpretação
-    interpretation_df = pd.DataFrame({
-        "Métrica": ["Value at Risk (95%)", "Conditional VaR (95%)", "Máximo Drawdown", "Volatilidade Anualizada"],
-        "Valor": [f"{var_95:.2%}", f"{cvar_95:.2%}", f"{max_dd:.2%}", f"{vol_anual:.2%}"],
-        "Interpretação": [
-            f"Em 95% dos casos, a perda diária não ultrapassará {abs(var_95):.2%}",
-            f"Em caso de evento extremo (5% piores dias), a perda média é de {abs(cvar_95):.2%}",
-            f"A maior queda histórica do ativo foi de {abs(max_dd):.2%}",
-            f"A volatilidade anualizada do ativo é {vol_anual:.2%}"
-        ]
-    })
-    
-    # Mostrar a tabela
-    st.table(interpretation_df)
-    
-    # Avaliação de risco
-    risk_score = _calculate_risk_score(var_95, cvar_95, max_dd, vol_anual)
-    risk_category = _get_risk_category(risk_score)
-    
-    # Exibir categoria de risco
-    st.markdown(f"### Classificação de Risco: {risk_category['color']} {risk_category['level']}")
-    
-    # Recomendações
-    st.markdown("#### Recomendações:")
-    for suggestion in risk_category['suggestions']:
-        st.markdown(f"- {suggestion}")
-
-
-def _calculate_risk_score(var_95, cvar_95, max_dd, vol_anual):
-    """Calcula pontuação de risco baseada nas métricas"""
-    var_score = min(abs(var_95) * 50, 5)  # Pontuar até 5 baseado no VaR
-    cvar_score = min(abs(cvar_95) * 30, 5)  # Pontuar até 5 baseado no CVaR
-    dd_score = min(abs(max_dd) * 10, 5)  # Pontuar até 5 baseado no Máximo Drawdown
-    vol_score = min(vol_anual * 10, 5)  # Pontuar até 5 baseado na volatilidade
-    
-    # Média ponderada das pontuações
-    risk_score = (var_score * 0.25 + cvar_score * 0.30 + 
-                 dd_score * 0.25 + vol_score * 0.20)
-    return risk_score
-
-
-def _get_risk_category(risk_score):
-    """Retorna categoria de risco baseada na pontuação"""
-    if risk_score <= 1.5:
-        return {
-            'level': "MUITO BAIXO",
-            'color': "🟢",
-            'recommendation': "Ativo de baixo risco",
-            'suggestions': ["Adequado para perfil conservador", "Pode compor a base do portfólio"]
-        }
-    elif risk_score <= 2.5:
-        return {
-            'level': "BAIXO", 
-            'color': "🟡",
-            'recommendation': "Ativo adequado para perfil moderadamente conservador",
-            'suggestions': ["Pode compor 40-60% do portfólio", "Adequado para diversificação"]
-        }
-    elif risk_score <= 3.5:
-        return {
-            'level': "MODERADO",
-            'color': "🟠", 
-            'recommendation': "Ativo de risco equilibrado",
-            'suggestions': ["Limite a 30-40% do portfólio", "Implemente stop-loss em -15%"]
-        }
-    elif risk_score <= 4.5:
-        return {
-            'level': "ALTO",
-            'color': "🔴",
-            'recommendation': "Ativo de alto risco, apenas para perfil arrojado", 
-            'suggestions': ["Limite a 15-25% do portfólio", "Stop-loss obrigatório"]
-        }
-    else:
-        return {
-            'level': "MUITO ALTO",
-            'color': "🚫",
-            'recommendation': "Ativo de risco extremo",
-            'suggestions': ["Máximo 5-10% do portfólio", "Monitoramento intraday necessário"]
-        }
 
 
 def advanced_pair_trading_tab(df):
@@ -2268,41 +2169,418 @@ def _display_asset_extreme_analysis(stat_analyzer, df, asset_symbol=PETR4_SYMBOL
         # Exibir resultados
         st.subheader(f"📉 Análise de Eventos Extremos - {asset_symbol}")
         
+        # Obter estatísticas
+        daily_stats = extreme_analysis.get('daily_statistics', {})
+        extreme_stats = extreme_analysis.get('extreme_statistics', {})
+        recovery_stats = extreme_analysis.get('recovery_statistics', {})
+        prob_empirical = extreme_analysis.get('probability', 0)
+        total_days = extreme_analysis.get('total_days', 0)
+        extreme_count = extreme_analysis.get('extreme_falls_count', 0)
+        extreme_dates = extreme_stats.get('dates', [])
+        
+        # Métricas principais
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            prob_empirical = extreme_analysis.get('probability', 0)
             st.metric("Prob. Empírica", f"{prob_empirical:.2%}")
         with col2:
-            total_days = extreme_analysis.get('total_days', 0)
-            extreme_count = extreme_analysis.get('extreme_falls_count', 0)
             st.metric("Eventos Extremos", f"{extreme_count}/{total_days}")
         with col3:
-            daily_stats = extreme_analysis.get('daily_statistics', {})
             daily_vol = daily_stats.get('std', 0)
             annual_vol = daily_vol * np.sqrt(252)
             st.metric("Volatilidade Anual", f"{annual_vol:.1%}")
         with col4:
             skewness = daily_stats.get('skewness', 0)
-            st.metric("Assimetria", f"{skewness:.2f}")
+            kurtosis_value = daily_stats.get('kurtosis', 0)
+            st.metric("Assimetria/Curtose", f"{skewness:.2f}/{kurtosis_value:.2f}")
+        
+        # Análise detalhada de distribuição de probabilidade
+        st.markdown("#### 📊 Distribuição de Retornos e Probabilidade de Eventos Extremos")
+        
+        # Criar tabs para diferentes análises
+        tab_empirical, tab_normal, tab_tstudent, tab_historico = st.tabs([
+            "📊 Empírica", 
+            "🔄 Normal", 
+            "📈 t-Student", 
+            "🗓️ Histórico"
+        ])
+        
+        # Preparar dados e distribuições teóricas
+        try:
+            asset_returns = df[asset_symbol].pct_change().dropna()
+            
+            with tab_empirical:
+                st.markdown("##### Análise Empírica")
+                
+                # Criar histograma com densidade
+                fig = go.Figure()
+                
+                # Calcular bins de forma dinâmica
+                bin_width = (asset_returns.max() - asset_returns.min()) / 40  # 40 bins é um bom compromisso
+                
+                # Adicionar histograma com densidade de probabilidade
+                fig.add_trace(go.Histogram(
+                    x=asset_returns,
+                    histnorm='probability density',
+                    name="Retornos",
+                    opacity=0.6,
+                    marker_color='#1f77b4'
+                ))
+                
+                # Adicionar linha vertical para o threshold
+                fig.add_vline(
+                    x=-threshold, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text=f"Threshold: -{threshold:.0%}",
+                    annotation_position="top right"
+                )
+                
+                # Customizar layout
+                fig.update_layout(
+                    title=f"Distribuição Empírica de Retornos: {asset_symbol}",
+                    xaxis_title="Retorno Diário",
+                    yaxis_title="Densidade de Probabilidade",
+                    showlegend=False
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Mostrar probabilidade empirica com mais detalhes
+                if extreme_count > 0:
+                    st.info(f"""
+                    📊 **Probabilidade Empírica**: {prob_empirical:.2%}
+                    
+                    Baseado em dados históricos, a probabilidade de {asset_symbol} ter uma queda diária superior a {threshold:.0%} é de {prob_empirical:.2%}.
+                    Isso equivale a aproximadamente 1 queda a cada {1/prob_empirical:.0f} dias de negociação, ou cerca de {252/prob_empirical:.1f} dias úteis por ano.
+                    """)
+                else:
+                    st.info("Não foram observadas quedas superiores ao threshold no período analisado.")
+            
+            with tab_normal:
+                st.markdown("##### Modelagem com Distribuição Normal")
+                
+                # Parâmetros da distribuição Normal
+                mu = asset_returns.mean()
+                sigma = asset_returns.std()
+                
+                # Probabilidade teórica baseada na Normal
+                prob_normal = stats.norm.cdf(-threshold, mu, sigma)
+                
+                # Criar gráfico
+                x = np.linspace(asset_returns.min(), asset_returns.max(), 1000)
+                y = stats.norm.pdf(x, mu, sigma)
+                
+                fig = go.Figure()
+                
+                # Adicionar histograma com densidade de probabilidade
+                fig.add_trace(go.Histogram(
+                    x=asset_returns,
+                    histnorm='probability density',
+                    name="Retornos",
+                    opacity=0.6,
+                    marker_color='#1f77b4'
+                ))
+                
+                # Adicionar curva de distribuição normal
+                fig.add_trace(go.Scatter(
+                    x=x,
+                    y=y,
+                    mode='lines',
+                    name='Normal',
+                    line=dict(color='red', width=2)
+                ))
+                
+                # Área sombreada para quedas extremas
+                x_extreme = np.linspace(asset_returns.min(), -threshold, 100)
+                y_extreme = stats.norm.pdf(x_extreme, mu, sigma)
+                
+                fig.add_trace(go.Scatter(
+                    x=x_extreme,
+                    y=y_extreme,
+                    fill='tozeroy',
+                    fillcolor='rgba(255,0,0,0.2)',
+                    line=dict(color='rgba(255,0,0,0)'),
+                    name=f'Prob. Normal: {prob_normal:.2%}'
+                ))
+                
+                # Adicionar linha vertical para o threshold
+                fig.add_vline(
+                    x=-threshold, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text=f"Threshold: -{threshold:.0%}",
+                    annotation_position="top right"
+                )
+                
+                # Customizar layout
+                fig.update_layout(
+                    title=f"Modelagem com Distribuição Normal: {asset_symbol}",
+                    xaxis_title="Retorno Diário",
+                    yaxis_title="Densidade de Probabilidade",
+                    showlegend=True
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Mostrar comparação entre probabilidade empírica e teórica
+                ratio = prob_empirical / prob_normal if prob_normal > 0 else 0
+                
+                if ratio > 1.3:
+                    st.warning(f"""
+                    ⚠️ **Alerta**: A probabilidade empírica ({prob_empirical:.2%}) é {ratio:.1f}x maior que a estimada pela distribuição Normal ({prob_normal:.2%}).
+                    
+                    Isso indica que o ativo possui **caudas mais pesadas** do que o previsto pela Normal, subestimando o risco de eventos extremos.
+                    """)
+                elif ratio < 0.7 and ratio > 0:
+                    st.info(f"""
+                    ℹ️ **Observação**: A probabilidade empírica ({prob_empirical:.2%}) é {1/ratio:.1f}x menor que a estimada pela distribuição Normal ({prob_normal:.2%}).
+                    
+                    Isso pode indicar que o período analisado teve menos eventos extremos do que o esperado teoricamente.
+                    """)
+                else:
+                    st.success(f"""
+                    ✅ **Validação**: A probabilidade empírica ({prob_empirical:.2%}) é relativamente próxima da estimada pela distribuição Normal ({prob_normal:.2%}).
+                    
+                    A modelagem Normal captura razoavelmente bem o comportamento de quedas do ativo neste threshold.
+                    """)
+            
+            with tab_tstudent:
+                st.markdown("##### Modelagem com Distribuição t-Student")
+                
+                # Estimar parâmetros da t-Student (graus de liberdade)
+                def t_loglikelihood(params, data):
+                    df, loc, scale = params
+                    return -np.sum(stats.t.logpdf(data, df=df, loc=loc, scale=scale))
+                
+                # Estimativa inicial baseada em momentos
+                initial_params = [6, asset_returns.mean(), asset_returns.std()]
+                
+                try:
+                    # Usar otimização para encontrar melhores parâmetros
+                    from scipy.optimize import minimize
+                    result = minimize(t_loglikelihood, initial_params, args=(asset_returns,), 
+                                     bounds=[(2.1, 50), (None, None), (0.0001, None)])
+                    
+                    df_param, loc_param, scale_param = result.x
+                    
+                    # Probabilidade teórica baseada na t-Student
+                    prob_t = stats.t.cdf(-threshold, df=df_param, loc=loc_param, scale=scale_param)
+                    
+                    # Criar gráfico
+                    x = np.linspace(asset_returns.min(), asset_returns.max(), 1000)
+                    y_t = stats.t.pdf(x, df=df_param, loc=loc_param, scale=scale_param)
+                    y_norm = stats.norm.pdf(x, mu, sigma)
+                    
+                    fig = go.Figure()
+                    
+                    # Adicionar histograma com densidade de probabilidade
+                    fig.add_trace(go.Histogram(
+                        x=asset_returns,
+                        histnorm='probability density',
+                        name="Retornos",
+                        opacity=0.4,
+                        marker_color='#1f77b4'
+                    ))
+                    
+                    # Adicionar curva de distribuição t-Student
+                    fig.add_trace(go.Scatter(
+                        x=x,
+                        y=y_t,
+                        mode='lines',
+                        name='t-Student',
+                        line=dict(color='red', width=2)
+                    ))
+                    
+                    # Adicionar curva de distribuição normal para comparação
+                    fig.add_trace(go.Scatter(
+                        x=x,
+                        y=y_norm,
+                        mode='lines',
+                        name='Normal',
+                        line=dict(color='green', width=2, dash='dash')
+                    ))
+                    
+                    # Área sombreada para quedas extremas (t-Student)
+                    x_extreme = np.linspace(asset_returns.min(), -threshold, 100)
+                    y_extreme = stats.t.pdf(x_extreme, df=df_param, loc=loc_param, scale=scale_param)
+                    
+                    fig.add_trace(go.Scatter(
+                        x=x_extreme,
+                        y=y_extreme,
+                        fill='tozeroy',
+                        fillcolor='rgba(255,0,0,0.2)',
+                        line=dict(color='rgba(255,0,0,0)'),
+                        name=f'Prob. t-Student: {prob_t:.2%}'
+                    ))
+                    
+                    # Adicionar linha vertical para o threshold
+                    fig.add_vline(
+                        x=-threshold, 
+                        line_dash="dash", 
+                        line_color="red",
+                        annotation_text=f"Threshold: -{threshold:.0%}",
+                        annotation_position="top right"
+                    )
+                    
+                    # Customizar layout
+                    fig.update_layout(
+                        title=f"Modelagem com Distribuição t-Student (v={df_param:.1f}): {asset_symbol}",
+                        xaxis_title="Retorno Diário",
+                        yaxis_title="Densidade de Probabilidade",
+                        showlegend=True
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Mostrar comparação entre probabilidades
+                    ratio_t = prob_empirical / prob_t if prob_t > 0 else 0                    # Tabela comparativa - com tratamento para evitar nan%
+                    prob_normal_display = "0.00%" if np.isnan(prob_normal) else f"{prob_normal:.2%}"
+                    prob_t_display = "0.00%" if np.isnan(prob_t) else f"{prob_t:.2%}" 
+                    
+                    normal_ratio = "0.00" if np.isnan(prob_normal) or prob_empirical == 0 else f"{prob_normal/prob_empirical:.2f}"
+                    t_ratio = "0.00" if np.isnan(prob_t) or prob_empirical == 0 else f"{prob_t/prob_empirical:.2f}"
+                    
+                    comp_df = pd.DataFrame({
+                        "Modelo": ["Empírico", "Normal", "t-Student"],
+                        "Probabilidade": [f"{prob_empirical:.2%}", prob_normal_display, prob_t_display],
+                        "Razão p/ Empírico": ["1.00", normal_ratio, t_ratio]
+                    })
+                    
+                    st.table(comp_df)
+                    
+                    # Adicionar botão de download para esta análise específica
+                    try:
+                        from pdf_export_helpers import add_download_buttons_to_extreme_analysis
+                        add_download_buttons_to_extreme_analysis(
+                            asset_symbol, threshold, prob_empirical, prob_normal, prob_t, df_param
+                        )
+                    except Exception as e:
+                        st.warning(f"Não foi possível adicionar opção de download: {str(e)}")
+                    
+                    if abs(ratio_t - 1) < 0.2 and ratio_t > 0:
+                        st.success(f"""
+                        ✅ **Validação**: A distribuição t-Student com {df_param:.1f} graus de liberdade modela bem os eventos extremos deste ativo.
+                        
+                        A probabilidade estimada pela t-Student ({prob_t:.2%}) está muito próxima da probabilidade empírica ({prob_empirical:.2%}).
+                        """)
+                    elif ratio_t > 1:
+                        st.warning(f"""
+                        ⚠️ **Alerta**: A probabilidade empírica ({prob_empirical:.2%}) ainda é maior que a estimada pela t-Student ({prob_t:.2%}).
+                        
+                        Isso sugere que mesmo a modelagem com t-Student pode estar subestimando o risco de quedas extremas neste ativo.
+                        """)
+                    else:
+                        st.info(f"""
+                        ℹ️ **Observação**: A modelagem com t-Student ({prob_t:.2%}) fornece uma estimativa mais conservadora que a probabilidade empírica ({prob_empirical:.2%}).
+                        
+                        Isso pode ser adequado para modelagem de risco com margem de segurança.
+                        """)
+                        
+                except Exception as e:
+                    st.warning(f"Não foi possível estimar os parâmetros da distribuição t-Student: {str(e)}")
+                    st.info("Verifique se há dados suficientes ou tente novamente com um conjunto de dados maior.")
+            
+            with tab_historico:
+                st.markdown("##### Datas de Quedas Extremas")
+                
+                if extreme_dates and len(extreme_dates) > 0:
+                    # Converter timestamps para strings formatadas
+                    if isinstance(extreme_dates[0], pd.Timestamp):
+                        date_strings = [date.strftime('%d/%m/%Y') for date in extreme_dates]
+                    else:
+                        date_strings = extreme_dates
+                    
+                    # Obter os retornos para essas datas
+                    extreme_returns_values = []
+                    for date in extreme_dates:
+                        try:
+                            if date in asset_returns.index:
+                                extreme_returns_values.append(asset_returns[date])
+                        except:
+                            extreme_returns_values.append(None)
+                    
+                    # Criar dataframe para exibição
+                    extreme_df = pd.DataFrame({
+                        "Data": date_strings,
+                        "Queda (%)": [f"{ret*100:.2f}%" if ret is not None else "N/A" for ret in extreme_returns_values]
+                    })
+                    
+                    st.dataframe(extreme_df, use_container_width=True)
+                    
+                    # Recuperação média
+                    mean_recovery = recovery_stats.get('mean_days', None)
+                    if mean_recovery:
+                        st.metric("Tempo Médio de Recuperação", f"{mean_recovery:.1f} dias")
+                        
+                        recovery_rate = recovery_stats.get('recovery_rate', None)
+                        if recovery_rate:
+                            st.info(f"""
+                            📈 **Recuperação**: {recovery_rate:.0%} das quedas superiores a {threshold:.0%} se recuperaram em até 30 dias.
+                            
+                            O tempo médio de recuperação é de {mean_recovery:.1f} dias após uma queda extrema.
+                            """)
+                else:
+                    st.info("Não foram observadas quedas superiores ao threshold no período analisado.")
+                    
+                # Oferecer botão para baixar dados de quedas extremas
+                if extreme_dates and len(extreme_dates) > 0:
+                    csv = extreme_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Baixar Dados de Quedas Extremas",
+                        data=csv,
+                        file_name=f'quedas_extremas_{asset_symbol}.csv',
+                        mime='text/csv',
+                    )
+        
+        except Exception as e:
+            st.error(f"Erro ao gerar análise detalhada: {str(e)}")
         
         # Exibir interpretação
-        st.markdown("#### Interpretação dos Resultados")
-        if prob_empirical > 0.05:  # 5%
+        st.markdown("#### 💡 Interpretação dos Resultados")
+        
+        # Determinar o modelo mais adequado para esta análise
+        best_model = "empírico"
+        best_prob = prob_empirical
+        
+        if 'prob_t' in locals() and abs(ratio_t - 1) < 0.2:
+            best_model = "t-Student"
+            best_prob = prob_t
+        elif 'prob_normal' in locals() and abs(ratio - 1) < 0.2:
+            best_model = "Normal"
+            best_prob = prob_normal
+            
+        # Interpretar em termos práticos
+        if best_prob > 0.05:  # 5%
             st.warning(f"""
-            ⚠️ **Alto Risco**: Probabilidade de {prob_empirical:.1%} para quedas superiores a {threshold:.0%} 
-            indica volatilidade elevada. Considere estratégias de hedge.
+            ⚠️ **Alto Risco**: Baseado no modelo {best_model}, a probabilidade de {best_prob:.2%} para quedas diárias superiores a {threshold:.0%} 
+            indica volatilidade elevada.
+            
+            **Recomendações:**
+            - Considere estratégias de hedge (opções de venda, stop-loss)
+            - Diversifique o portfólio para reduzir exposição
+            - Monitore atentamente fatores externos que podem amplificar quedas
             """)
-        elif prob_empirical > 0.02:  # 2%
+        elif best_prob > 0.02:  # 2%
             st.info(f"""
-            💡 **Risco Moderado**: Probabilidade de {prob_empirical:.1%} é significativa. 
-            Monitore indicadores macro e setoriais.
+            💡 **Risco Moderado**: Baseado no modelo {best_model}, a probabilidade de {best_prob:.2%} para quedas diárias superiores a {threshold:.0%}
+            é significativa.
+            
+            **Recomendações:**
+            - Monitore indicadores macro e setoriais que podem afetar o ativo
+            - Mantenha um plano de contingência para eventos negativos
+            - Considere um mix de posições de longo prazo e proteções táticas
             """)
         else:
             st.success(f"""
-            ✅ **Risco Baixo**: Probabilidade de {prob_empirical:.1%} é relativamente baixa 
-            para quedas extremas no horizonte analisado.
+            ✅ **Risco Controlado**: Baseado no modelo {best_model}, a probabilidade de {best_prob:.2%} para quedas diárias superiores a {threshold:.0%}
+            é relativamente baixa no horizonte analisado.
+            
+            **Recomendações:**
+            - Mantenha monitoramento regular dos indicadores de risco
+            - Reavalie periodicamente essa análise, especialmente após mudanças de mercado significativas
+            - Considere este ativo para estratégias de longo prazo com uma tolerância controlada ao risco
             """)
         
     except Exception as e:
-        st.error(f"Erro na análise de extremos: {str(e)}")
-        st.info("Falha ao executar análise detalhada.")
+        st.error(f"Erro na análise de eventos extremos: {str(e)}")
+        st.info("Falha ao executar análise detalhada. Verifique os dados ou tente com um período mais longo.")
