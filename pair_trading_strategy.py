@@ -36,6 +36,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
+from financial_formatting import format_percentage, format_ratio
 
 # Configurações
 warnings.filterwarnings('ignore')
@@ -716,12 +717,16 @@ def main():
     # 6. Resultados finais com parâmetros otimizados
     final_signals = optimized_params['signals']
     final_backtest = optimized_params['backtest']
-    
     print(f"\n📊 RESULTADOS FINAIS (OTIMIZADOS):")
     print(f"💰 Capital Inicial: R$ 100.000")
     print(f"💵 Capital Final: R$ {final_backtest['equity_curve'].iloc[-1]:,.2f}")
     print(f"📈 Retorno Total: {final_backtest['total_return']:.2%}")
     print(f"📅 Retorno Anualizado: {final_backtest['annual_return']:.2%}")
+    
+    # Calcular retorno mensal baseado no retorno anualizado
+    monthly_return = (1 + final_backtest['annual_return']) ** (1/12) - 1
+    print(f"📊 Retorno Mensal: {monthly_return:.2%}")
+    
     print(f"⚡ Sharpe Ratio: {final_backtest['sharpe_ratio']:.2f}")
     print(f"📉 Max Drawdown: {final_backtest['max_drawdown']:.2%}")
     print(f"🔢 Número de Trades: {final_backtest['num_trades']}")

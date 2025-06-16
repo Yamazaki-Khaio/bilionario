@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from financial_formatting import format_percentage, format_ratio, auto_format_metric
 
 def calculate_metrics(returns, initial_capital=10000):
     """
@@ -10,7 +11,7 @@ def calculate_metrics(returns, initial_capital=10000):
         initial_capital (float): Capital inicial
         
     Returns:
-        dict: Dicionário com métricas calculadas
+        dict: Dicionário com métricas calculadas (retornos e volatilidades já em porcentagem)
     """
     # Converte para Series se for necessário
     if isinstance(returns, list):
@@ -18,16 +19,16 @@ def calculate_metrics(returns, initial_capital=10000):
     
     # Remove valores NaN
     returns = returns.dropna()
-    
     if len(returns) == 0:
         return {
             'total_return': 0.0,
             'annual_return': 0.0,
+            'monthly_return': 0.0,
             'annual_volatility': 0.0,
             'max_drawdown': 0.0,
             'sharpe_ratio': 0.0
         }
-    
+
     # Retorno total
     total_return = (1 + returns).prod() - 1
     
@@ -36,10 +37,13 @@ def calculate_metrics(returns, initial_capital=10000):
     years = trading_days / 252
     annual_return = (1 + total_return) ** (1/years) - 1 if years > 0 else 0
     
+    # Retorno mensal médio (assumindo 21 dias úteis por mês)
+    months = trading_days / 21
+    monthly_return = (1 + total_return) ** (1/months) - 1 if months > 0 else annual_return / 12
+    
     # Volatilidade anualizada
     annual_volatility = returns.std() * np.sqrt(252)
-    
-    # Drawdown máximo
+      # Drawdown máximo
     cumulative = (1 + returns).cumprod()
     running_max = cumulative.expanding().max()
     drawdown = (cumulative - running_max) / running_max
@@ -51,6 +55,7 @@ def calculate_metrics(returns, initial_capital=10000):
     return {
         'total_return': total_return,
         'annual_return': annual_return,
+        'monthly_return': monthly_return,
         'annual_volatility': annual_volatility,
         'max_drawdown': max_drawdown,
         'sharpe_ratio': sharpe_ratio

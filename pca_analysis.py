@@ -174,7 +174,7 @@ def main():
     try:
         # Carregar e preparar dados
         print("Carregando dados...")
-        df, returns = load_and_prepare_data()
+        returns = load_and_prepare_data()
         print(f"Dados carregados: {returns.shape[0]} observações, {returns.shape[1]} ativos")
         
         # Análise PCA
@@ -194,7 +194,7 @@ def main():
         interpretations = interpret_components(results)
         
         # Resumo final
-        print(f"\nResumo da Análise PCA:")
+        print("\nResumo da Análise PCA:")
         print(f"Número de componentes analisados: {len(results['explained_variance_ratio'])}")
         print(f"Variância explicada pelos 3 primeiros PCs: {results['cumulative_variance'][2]:.1%}")
         print(f"Primeiro PC explica: {results['explained_variance_ratio'][0]:.1%}")

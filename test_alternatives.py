@@ -19,7 +19,8 @@ valid_tickers = []
 
 for ticker in alternatives:
     try:
-        data = yf.download(ticker, period="5d", progress=False)        if len(data) > 0:
+        data = yf.download(ticker, period="5d", progress=False)
+        if len(data) > 0:
             print(f"✅ {ticker}: {len(data)} linhas - VÁLIDO")
             try:
                 last_price = data['Close'].iloc[-1]

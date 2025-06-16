@@ -1,0 +1,175 @@
+/* Estilos personalizados para melhorar a UX do Bilionário App */
+
+/* Efeitos de hover para botões */
+div[data-testid="stButton"] button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+/* Efeito nos cards */
+div.element-container div.stMarkdown:has(div.st-emotion-cache-1sno8jx) {
+    transition: transform 0.3s ease;
+}
+
+div.element-container div.stMarkdown:has(div.st-emotion-cache-1sno8jx):hover {
+    transform: scale(1.02);
+}
+
+/* Estilo para a área de upload */
+[data-testid="stFileUploader"] {
+    border: 2px dashed rgba(49, 51, 63, 0.4);
+    border-radius: 10px;
+    padding: 10px;
+    transition: all 0.3s;
+}
+
+[data-testid="stFileUploader"]:hover {
+    border-color: #4CAF50;
+    background-color: rgba(76, 175, 80, 0.05);
+}
+
+/* Animação para tabs */
+[data-testid="stTabs"] button[role="tab"] {
+    transition: background-color 0.3s, color 0.3s;
+}
+
+[data-testid="stTabs"] button[role="tab"]:hover:not([aria-selected="true"]) {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: #4CAF50;
+}
+
+/* Highlight para métricas */
+[data-testid="stMetric"] {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    padding: 10px;
+    transition: all 0.3s;
+}
+
+[data-testid="stMetric"]:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: scale(1.03);
+}
+
+/* Estilo para as colunas */
+[data-testid="column"] {
+    transition: all 0.3s ease;
+}
+
+[data-testid="column"]:hover {
+    transform: translateY(-2px);
+}
+
+/* Animação para a carga de dados */
+.loading-animation {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.6;
+    }
+}
+
+/* Scroll mais suave */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Destaque para alertas e mensagens */
+[data-testid="stAlert"] {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Feedback visual para carregamento */
+.hover-feedback {
+    position: relative;
+}
+
+.hover-feedback::after {
+    content: "✨";
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    opacity: 0;
+    transition: all 0.3s;
+}
+
+.hover-feedback:hover::after {
+    opacity: 1;
+}
+
+/* Estilos específicos para relatório de trading */
+.trade-report-container {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin: 10px 0;
+}
+
+.trade-report-header {
+    background: linear-gradient(135deg, #6A82FB, #FC5C7D);
+    color: white;
+    padding: 15px;
+    font-weight: bold;
+}
+
+.trade-report-body {
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Animações para gráficos */
+.plotly-graph-div {
+    transition: transform 0.3s ease;
+}
+
+.plotly-graph-div:hover {
+    transform: scale(1.01);
+}
+
+/* Feedback de seleção nos filtros */
+[data-testid="stMultiSelect"] [data-testid="stVerticalBlock"] {
+    transition: all 0.3s ease;
+}
+
+[data-testid="stMultiSelect"] [data-testid="stVerticalBlock"]:hover {
+    background-color: rgba(76, 175, 80, 0.05);
+}
+
+/* Estilos para gráficos de radar */
+.js-plotly-plot .polar .polarsublayer {
+    transition: opacity 0.3s ease;
+}
+
+.js-plotly-plot:hover .polar .polarsublayer {
+    opacity: 0.9;
+}
+
+/* Feedback para filtros de data */
+[data-testid="stDateInput"] {
+    transition: all 0.3s ease;
+}
+
+[data-testid="stDateInput"]:focus-within {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.5);
+}

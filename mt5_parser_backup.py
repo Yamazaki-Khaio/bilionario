@@ -47,6 +47,9 @@ class MT5ReportParser:
             else:
                 html_content = str(self.file_content)
             
+            # Debug do conteúdo HTML (opcional)
+            # self.debug_html_content(html_content)
+            
             # Múltiplas estratégias de parsing
             parsed_data = None
             
@@ -90,7 +93,7 @@ class MT5ReportParser:
         ]
         
         for pattern in json_patterns:
-            json_match = re.search(pattern, html_content, re.DOTALL)
+            json_match = re.search(pattern, html_content, re.DOTALL)            
             if json_match:
                 try:
                     return json.loads(json_match.group(1))
@@ -159,6 +162,7 @@ class MT5ReportParser:
             }
             
             extracted_data = {}
+            
             for field, pattern_list in patterns.items():
                 for pattern in pattern_list:
                     match = re.search(pattern, html_content, re.IGNORECASE)
@@ -172,25 +176,26 @@ class MT5ReportParser:
             return None
 
     def _try_beautifulsoup_parsing(self, html_content):
-        """Estratégia 4: BeautifulSoup com múltiplos seletores"""
+        """Estratégia 4: BeautifulSoup com seletores específicos"""
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             
-            # Procurar por elementos com IDs ou classes conhecidas
+            # Procurar por elementos com classes ou IDs específicos
             selectors = [
-                '#balance, .balance',
-                '#profit, .profit',
-                '#equity, .equity',
-                '#drawdown, .drawdown'
+                '.balance', '#balance', '[data-balance]',
+                '.profit', '#profit', '[data-profit]',
+                '.equity', '#equity', '[data-equity]',
+                '.account', '#account', '[data-account]'
             ]
             
             extracted_data = {}
+            
             for selector in selectors:
                 elements = soup.select(selector)
                 for element in elements:
                     text = element.get_text(strip=True)
-                    if text and any(char.isdigit() for char in text):
-                        field_name = selector.replace('#', '').replace('.', '').split(',')[0]
+                    if text and any(c.isdigit() for c in text):
+                        field_name = selector.replace('.', '').replace('#', '').replace('[data-', '').replace(']', '')
                         extracted_data[field_name] = self._parse_currency(text)
             
             return extracted_data if extracted_data else None
@@ -202,8 +207,7 @@ class MT5ReportParser:
         """Converte string de moeda para float"""
         try:
             # Remove símbolos de moeda e espaços
-            clean_value = re.sub(r'[R$\s]', '', str(value))
-            # Substitui vírgula por ponto se for decimal brasileiro
+            clean_value = re.sub(r'[R$\s]', '', str(value))            # Substitui vírgula por ponto se for decimal brasileiro
             if ',' in clean_value and '.' not in clean_value:
                 clean_value = clean_value.replace(',', '.')
             elif ',' in clean_value and '.' in clean_value:
@@ -234,8 +238,7 @@ class MT5ReportParser:
             'summaryIndicators': {
                 'drawdown': 0, 'sharp_ratio': 0, 'profit_factor': 0,
                 'recovery_factor': 0, 'trades_per_week': 0
-            },
-            'profitTotal': {'profit': 0, 'loss': 0},
+            },            'profitTotal': {'profit': 0, 'loss': 0},
             'symbolsTotal': {'total': []},
             'longShortTotal': {'long': 0, 'short': 0},
             'longShortIndicators': {'win_trades': 0}
@@ -427,7 +430,6 @@ class MT5ReportParser:
             t = page.extract_text()
             if t:
                 text += t + "\n"
-                
         # Extração dos diferentes indicadores
         self._extract_account_info(text)
         self._extract_performance(text)
@@ -436,192 +438,28 @@ class MT5ReportParser:
 
     def _extract_account_info(self, text):
         """Extrai informações da conta do texto PDF"""
-        # Padrões para informações de conta
-        account_patterns = {
-            'account_name': [r'Nome da conta:?\s*(.+?)\s*\n', r'Account name:?\s*(.+?)\s*\n'],
-            'account_number': [r'Número da conta:?\s*(\d+)', r'Account number:?\s*(\d+)'],
-            'currency': [r'Moeda:?\s*(.+?)\s*\n', r'Currency:?\s*(.+?)\s*\n']
-        }
-        
-        for field, patterns in account_patterns.items():
-            for pattern in patterns:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    self.portfolio_data[field] = match.group(1).strip()
-                    break
-            
-            # Valor padrão se não encontrado
-            if field not in self.portfolio_data:
-                self.portfolio_data[field] = 'N/A' if field != 'currency' else 'BRL'    
-    
+        # Implementar extração de conta para PDF
+        pass
+
     def _extract_performance(self, text):
         """Extrai métricas de performance do texto PDF"""
-        # Extrair métricas usando métodos auxiliares para reduzir complexidade cognitiva
-        self._extract_profit_metrics(text)
-        self._extract_risk_metrics(text)
-        self._extract_activity_metrics(text)
-
-    def _extract_profit_metrics(self, text):
-        """Extrai métricas relacionadas a lucro"""
-        profit_metrics = {
-            'profit_factor': [r'Profit factor:?\s*([\d.,]+)', r'Fator de lucro:?\s*([\d.,]+)'],
-            'recovery_factor': [r'Recovery factor:?\s*([\d.,]+)', r'Fator de recuperação:?\s*([\d.,]+)']
-        }
-        self._extract_metrics_by_type(text, profit_metrics, numeric=True)
-        
-    def _extract_risk_metrics(self, text):
-        """Extrai métricas relacionadas a risco"""
-        risk_metrics = {
-            'sharp_ratio': [r'Sharp ratio:?\s*([\d.,]+)', r'Razão Sharpe:?\s*([\d.,]+)'],
-            'drawdown': [r'Drawdown:?\s*([\d.,]+%)', r'Drawdown:?\s*([\d.,]+)%']
-        }
-        self._extract_metrics_by_type(text, risk_metrics, numeric=True)
-        
-    def _extract_activity_metrics(self, text):
-        """Extrai métricas de atividade de trading"""
-        activity_metrics = {
-            'trading_activity': [r'Trading activity:?\s*([\d.,]+%)', r'Atividade de trading:?\s*([\d.,]+)%']
-        }
-        self._extract_metrics_by_type(text, activity_metrics, is_percentage=True)
-    
-    def _extract_metrics_by_type(self, text, metrics_dict, numeric=False, is_percentage=False):
-        """Método de utilidade para extrair diferentes tipos de métricas do texto"""
-        for field, patterns in metrics_dict.items():
-            for pattern in patterns:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    value = match.group(1)
-                    
-                    # Conversões específicas por tipo
-                    if numeric:
-                        try:
-                            value = float(value.replace(',', '.').replace('%', ''))
-                        except (ValueError, TypeError):
-                            value = 0
-                    
-                    self.portfolio_data[field] = value
-                    break
-            
-            # Valor padrão se não encontrado
-            if field not in self.portfolio_data:
-                if is_percentage:
-                    self.portfolio_data[field] = "0%"
-                else:
-                    self.portfolio_data[field] = 0
+        # Implementar extração de performance para PDF
+        pass
 
     def _extract_balance(self, text):
         """Extrai dados de balanço do texto PDF"""
-        # Padrões para balanço
-        balance_patterns = {
-            'balance': [r'Balance:?\s*([R$]?[\d.,]+)', r'Saldo:?\s*([R$]?[\d.,]+)'],
-            'equity': [r'Equity:?\s*([R$]?[\d.,]+)', r'Patrimônio:?\s*([R$]?[\d.,]+)'],
-            'net_profit': [r'Profit:?\s*([R$]?[\d.,]+)', r'Lucro:?\s*([R$]?[\d.,]+)'],
-            'initial_capital': [r'Initial capital:?\s*([R$]?[\d.,]+)', r'Capital inicial:?\s*([R$]?[\d.,]+)']
-        }
-        
-        for field, patterns in balance_patterns.items():
-            for pattern in patterns:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    value = self._parse_currency(match.group(1))
-                    self.portfolio_data[field] = value
-                    break
-        
-        # Calcular capital inicial se não encontrado
-        if 'initial_capital' not in self.portfolio_data:
-            balance = self.portfolio_data.get('balance', 0)
-            net_profit = self.portfolio_data.get('net_profit', 0)
-            
-            if balance > 0 and net_profit != 0:
-                self.portfolio_data['initial_capital'] = balance - net_profit
-            else:
-                self.portfolio_data['initial_capital'] = balance if balance > 0 else 10000    
-    
+        # Implementar extração de balanço para PDF
+        pass
+
     def _extract_symbols(self, text):
         """Extrai símbolos do texto PDF"""
-        # Procura por tabela de símbolos usando padrão não-relutante
-        symbols_regex = r'Symbol\s+Profit[\s\S]+?Total([\s\S]+?)(?:\n\n|\Z)'
-        symbols_match = re.search(symbols_regex, text, re.IGNORECASE)
-        
-        # Dicionário para armazenar dados de símbolos
-        symbols = {}
-        
-        if symbols_match:
-            symbols_text = symbols_match.group(1)
-            # Extrai linhas da tabela com padrão mais estrito
-            symbol_lines = re.findall(r'([A-Z0-9.]+)\s+([-+]?[\d.,]+)', symbols_text)
-            
-            # Processar símbolos válidos
-            self._process_symbol_lines(symbol_lines, symbols)
-        
-        # Armazenar resultado
-        self.portfolio_data['symbols'] = symbols
-        
-        # Extrair métricas de trades
-        self._extract_trade_metrics(text)
-    
-    def _process_symbol_lines(self, symbol_lines, symbols_dict):
-        """Processa linhas de símbolos extraídas do relatório"""
-        for symbol, profit_str in symbol_lines:
-            # Ignora totais e símbolos inválidos
-            if symbol.lower() in ['total', 'symbol']:
-                continue
-            
-            # Converte profit para float
-            profit = self._parse_currency(profit_str)
-            symbols_dict[symbol] = profit
-    
-    def _extract_trade_metrics(self, text):
-        """Extrai métricas relacionadas a trades do texto"""
-        # Extrai total de trades
-        trades_match = re.search(r'Total trades:?\s*(\d+)', text, re.IGNORECASE)
-        self.portfolio_data['total_trades'] = int(trades_match.group(1)) if trades_match else 0
-            
-        # Extrai win rate
-        win_rate_match = re.search(r'Win trades:?\s*(\d+)\s*\(\s*([\d.,%]+)\s*\)', text, re.IGNORECASE)
-        if win_rate_match:
-            win_rate_str = win_rate_match.group(2)
-            try:
-                win_rate = float(win_rate_str.replace(',', '.').replace('%', ''))
-                self.portfolio_data['win_rate'] = win_rate
-            except (ValueError, TypeError):
-                self.portfolio_data['win_rate'] = 0
-        else:
-            self.portfolio_data['win_rate'] = 0
+        # Implementar extração de símbolos para PDF
+        pass
 
     def get_portfolio_summary(self):
         """Retorna resumo do portfólio MT5 processado"""
-        # Se portfolio_data estiver vazio, inicializar com dados padrão
         if not self.portfolio_data:
-            st.warning("⚠️ Nenhum dado foi extraído do arquivo MT5. Usando valores padrão.")
-            # Chama parse() para tentar processar novamente
-            self.parse()
-            # Se ainda estiver vazio após parse, criar dados padrão mínimos
-            if not self.portfolio_data:
-                self.portfolio_data = {
-                    'account_name': 'Conta MT5',
-                    'account_number': 'N/A',
-                    'currency': 'BRL',
-                    'balance': 0,
-                    'equity': 0,
-                    'net_profit': 0,
-                    'initial_capital': 0,
-                    'gain': '0%',
-                    'drawdown': '0%',
-                    'trading_activity': '0%',
-                    'sharp_ratio': 0,
-                    'profit_factor': 0,
-                    'recovery_factor': 0,
-                    'trades_per_week': 0,
-                    'profit': 0,
-                    'loss': 0,
-                    'symbols': {},
-                    'long_trades': 0,
-                    'short_trades': 0,
-                    'total_trades': 0,
-                    'win_trades': 0,
-                    'win_rate': 0
-                }
+            return None
         
         return {
             'account_name': self.portfolio_data.get('account_name', 'N/A'),

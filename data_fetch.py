@@ -34,7 +34,7 @@ OUTPUT_DIR = 'data'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Baixar dados ajustados (closing prices)
-def fetch_data(start='2020-01-01', end=None):
+def fetch_data(start='2005-01-01', end=None):
     # Download com preços ajustados (Close já ajustado em yfinance v0.2+)
     df = yf.download(TICKERS, start=start, end=end, auto_adjust=True)['Close']
     df.to_csv(os.path.join(OUTPUT_DIR, 'raw_data.csv'))

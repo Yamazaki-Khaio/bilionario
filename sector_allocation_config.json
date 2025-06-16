@@ -1,0 +1,12 @@
+{
+  "sector_allocations": {
+    "acoes": 25,
+    "etfs_indices": 25,
+    "criptomoedas": 25,
+    "forex": 25
+  },
+  "total_capital": 100000.0,
+  "risk_tolerance": 5,
+  "rebalance_frequency": "Mensal",
+  "timestamp": "2025-06-14T10:00:11.711160"
+}

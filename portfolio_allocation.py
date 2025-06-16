@@ -5,6 +5,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import streamlit as st
 from data_fetch import ASSET_CATEGORIES
+from financial_formatting import format_percentage, format_currency, format_ratio
 
 class PortfolioAllocationManager:
     """Gestão de alocação de capital por setor de ativos"""
@@ -129,9 +130,8 @@ class PortfolioAllocationManager:
         for sector, assets in selected_by_sector.items():
             if not assets:
                 continue
-                
             sector_returns = []
-            sector_weights = []
+            sector_asset_weights = []
             
             for asset in assets:
                 if asset in self.returns_data.columns and asset in weights:
@@ -143,13 +143,15 @@ class PortfolioAllocationManager:
                     if sector_total_weight > 0:
                         normalized_weight = asset_weight / sector_total_weight
                         sector_returns.append(asset_returns * normalized_weight)
+                        sector_asset_weights.append(normalized_weight)
             
             if sector_returns:
                 sector_return_series = sum(sector_returns)
-                
-                # Calcular métricas do setor
+                  # Calcular métricas do setor
                 total_return = (1 + sector_return_series).prod() - 1
                 annual_return = (1 + total_return) ** (252 / len(sector_return_series)) - 1
+                # Calcular retorno mensal baseado no retorno anualizado
+                monthly_return = (1 + annual_return) ** (1/12) - 1
                 volatility = sector_return_series.std() * np.sqrt(252)
                 sharpe = annual_return / volatility if volatility > 0 else 0
                 
@@ -160,6 +162,7 @@ class PortfolioAllocationManager:
                 sector_performance[sector] = {
                     'total_return': total_return,
                     'annual_return': annual_return,
+                    'monthly_return': monthly_return,
                     'volatility': volatility,
                     'sharpe_ratio': sharpe,
                     'max_drawdown': drawdown,
@@ -217,11 +220,11 @@ class PortfolioAllocationManager:
             'criptomoedas': 'Criptomoedas',
             'forex': 'Forex'
         }
-        
-        # Métricas para comparação
+          # Métricas para comparação
         metrics_data = {
             'Setor': [sector_names.get(sector, sector) for sector in sectors],
             'Retorno Anual (%)': [sector_performance[sector]['annual_return'] * 100 for sector in sectors],
+            'Retorno Mensal (%)': [sector_performance[sector]['monthly_return'] * 100 for sector in sectors],
             'Volatilidade (%)': [sector_performance[sector]['volatility'] * 100 for sector in sectors],
             'Sharpe Ratio': [sector_performance[sector]['sharpe_ratio'] for sector in sectors],
             'Max Drawdown (%)': [sector_performance[sector]['max_drawdown'] * 100 for sector in sectors],
@@ -330,7 +333,6 @@ class PortfolioAllocationManager:
             return {}
             
         summary = {}
-        
         for sector, data in sector_performance.items():
             sector_name = {
                 'acoes': 'Ações',
@@ -340,14 +342,15 @@ class PortfolioAllocationManager:
             }.get(sector, sector)
             
             summary[sector_name] = {
-                'Alocação': f"R$ {data['allocation']:,.2f}",
-                'Retorno Total': f"{data['total_return']:.2%}",
-                'Retorno Anual': f"{data['annual_return']:.2%}",
-                'Volatilidade': f"{data['volatility']:.2%}",
-                'Sharpe Ratio': f"{data['sharpe_ratio']:.2f}",
-                'Max Drawdown': f"{data['max_drawdown']:.2%}",
+                'Alocação': format_currency(data['allocation']),
+                'Retorno Total': format_percentage(data['total_return']),
+                'Retorno Anual': format_percentage(data['annual_return']),
+                'Retorno Mensal': format_percentage(data['monthly_return']),
+                'Volatilidade': format_percentage(data['volatility']),
+                'Sharpe Ratio': format_ratio(data['sharpe_ratio']),
+                'Max Drawdown': format_percentage(data['max_drawdown']),
                 'Ativos': ', '.join([asset.replace('.SA', '').replace('-USD', '').replace('=X', '') 
-                                   for asset in data['assets']])
+                                    for asset in data['assets']])
             }
-        
+    
         return summary

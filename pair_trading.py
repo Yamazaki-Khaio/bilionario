@@ -8,6 +8,7 @@ import streamlit as st
 from scipy import stats
 from statsmodels.tsa.stattools import coint
 import warnings
+from financial_formatting import format_percentage, format_ratio
 warnings.filterwarnings('ignore')
 
 class PairTradingAnalysis:
@@ -37,29 +38,14 @@ class PairTradingAnalysis:
         Returns:
             list: Lista de pares correlacionados
         """        # Verificar se temos dados suficientes
-        min_periods = min_years * 252  # aproximadamente 252 dias úteis por ano
-        if len(self.price_data) < min_periods:
-            st.warning(f"Dados insuficientes. Necessário pelo menos {min_years} anos de dados.")
-            return []
-        
-        # Verificar se temos dados de retorno válidos
-        if self.returns_data is None or self.returns_data.empty:
-            st.error("Dados de retorno inválidos ou vazios.")
+        if not self._validate_data_sufficiency(min_years):
             return []
         
         # Calcular matriz de correlação
-        try:
-            self.correlation_matrix = self.returns_data.corr()
-            
-            # Verificar se a matriz de correlação foi calculada corretamente
-            if self.correlation_matrix is None or self.correlation_matrix.empty:
-                st.error("Não foi possível calcular a matriz de correlação.")
-                return []
-                
-        except Exception as e:
-            st.error(f"Erro ao calcular matriz de correlação: {str(e)}")
+        if not self._calculate_correlation_matrix():
             return []
-          # Encontrar pares correlacionados
+        
+        # Encontrar pares correlacionados
         pairs = []
         assets = self.correlation_matrix.columns
         
@@ -67,28 +53,15 @@ class PairTradingAnalysis:
             for j in range(i+1, len(assets)):
                 asset1, asset2 = assets[i], assets[j]
                 
-                try:
-                    # Verificar se os ativos existem na matriz de correlação
-                    if asset1 not in self.correlation_matrix.index or asset2 not in self.correlation_matrix.columns:
-                        continue
-                        
-                    correlation = self.correlation_matrix.loc[asset1, asset2]
-                    
-                    # Verificar se a correlação é um número válido
-                    if pd.isna(correlation) or not isinstance(correlation, (int, float)):
-                        continue
-                        
-                    if abs(correlation) >= min_correlation:
-                        pairs.append({
-                            'asset1': asset1,
-                            'asset2': asset2,
-                            'correlation': correlation,
-                            'abs_correlation': abs(correlation)
-                        })
-                        
-                except Exception as e:
-                    st.warning(f"Erro ao processar correlação entre {asset1} e {asset2}: {str(e)}")
-                    continue
+                correlation = self._extract_valid_correlation(asset1, asset2)
+                
+                if correlation is not None and abs(correlation) >= min_correlation:
+                    pairs.append({
+                        'asset1': asset1,
+                        'asset2': asset2,
+                        'correlation': correlation,
+                        'abs_correlation': abs(correlation)
+                    })
         
         # Ordenar por correlação absoluta
         pairs = sorted(pairs, key=lambda x: x['abs_correlation'], reverse=True)
@@ -96,6 +69,53 @@ class PairTradingAnalysis:
         
         return pairs
     
+    def _validate_data_sufficiency(self, min_years):
+        """Valida se há dados suficientes para análise"""
+        min_periods = min_years * 252  # aproximadamente 252 dias úteis por ano
+        if len(self.price_data) < min_periods:
+            st.warning(f"Dados insuficientes. Necessário pelo menos {min_years} anos de dados.")
+            return False
+        
+        if self.returns_data is None or self.returns_data.empty:
+            st.error("Dados de retorno inválidos ou vazios.")
+            return False
+        
+        return True
+    
+    def _calculate_correlation_matrix(self):
+        """Calcula matriz de correlação com tratamento de erros"""
+        try:
+            self.correlation_matrix = self.returns_data.corr()
+            
+            if self.correlation_matrix is None or self.correlation_matrix.empty:
+                st.error("Não foi possível calcular a matriz de correlação.")
+                return False
+                
+        except Exception as e:
+            st.error(f"Erro ao calcular matriz de correlação: {str(e)}")
+            return False
+        
+        return True
+    
+    def _extract_valid_correlation(self, asset1, asset2):
+        """Extrai correlação válida entre dois ativos"""
+        try:
+            # Verificar se os ativos existem na matriz de correlação
+            if asset1 not in self.correlation_matrix.index or asset2 not in self.correlation_matrix.columns:
+                return None
+                
+            correlation = self.correlation_matrix.loc[asset1, asset2]
+            
+            # Verificar se a correlação é um número válido
+            if pd.isna(correlation) or not isinstance(correlation, (int, float)):
+                return None
+                
+            return correlation
+            
+        except Exception as e:
+            st.warning(f"Erro ao processar correlação entre {asset1} e {asset2}: {str(e)}")
+            return None
+
     def test_cointegration(self, asset1, asset2):
         """
         Testa cointegração entre dois ativos usando teste de Engle-Granger
@@ -146,12 +166,11 @@ class PairTradingAnalysis:
             
             self.cointegration_results[f"{asset1}_{asset2}"] = result
             return result
-            
         except Exception as e:
             st.error(f"Erro no teste de cointegração para {asset1} vs {asset2}: {str(e)}")
             return None
     
-    def generate_trading_signals(self, coint_result, entry_threshold=2.0, exit_threshold=0.5):
+    def generate_trading_signals(self, coint_result, entry_threshold=2.0, exit_threshold=0.5, stop_loss=3.5):
         """
         Gera sinais de trading baseados no spread
         
@@ -159,6 +178,7 @@ class PairTradingAnalysis:
             coint_result (dict): Resultado do teste de cointegração
             entry_threshold (float): Limiar para entrada (em desvios padrão)
             exit_threshold (float): Limiar para saída (em desvios padrão)
+            stop_loss (float): Limiar para stop loss (em desvios padrão)
             
         Returns:
             pd.DataFrame: DataFrame com sinais de trading
@@ -176,11 +196,13 @@ class PairTradingAnalysis:
         signals['z_score'] = z_score
         signals['signal'] = 0
         signals['position'] = 0
-        
-        # Lógica de entrada e saída
+          # Lógica de entrada e saída
         for i in range(1, len(signals)):
+            # Stop Loss: sair da posição se o spread se mover muito contra nós
+            if abs(z_score.iloc[i]) > stop_loss:
+                signals['signal'].iloc[i] = 0
             # Entrada: spread muito alto (vender asset2, comprar asset1)
-            if z_score.iloc[i] > entry_threshold:
+            elif z_score.iloc[i] > entry_threshold:
                 signals['signal'].iloc[i] = -1
             # Entrada: spread muito baixo (comprar asset2, vender asset1)
             elif z_score.iloc[i] < -entry_threshold:
