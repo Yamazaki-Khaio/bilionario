@@ -242,6 +242,10 @@ def extreme_analysis_tab(stat_analyzer, df):
     """Tab 1: Análise de extremos de ativos"""
     st.subheader("🎯 Análise de Extremos de Ativos")
     
+    # Chave para lembrar que estamos na aba de análise de extremos
+    tab_state_key = "active_tab_extreme_analysis"
+    st.session_state[tab_state_key] = True
+    
     # Seleção do ativo
     available_assets = [col for col in df.columns if df[col].dtype in ['float64', 'int64']]
     
@@ -376,6 +380,10 @@ def _display_extreme_interpretation(prob_empirical, threshold):
 def distribution_comparison_tab(stat_analyzer):
     """Tab 2: Comparação de distribuições"""
     st.subheader("📈 Comparação Estatística de Distribuições")
+    
+    # Chave para lembrar que estamos na aba de comparação de distribuições
+    tab_state_key = "active_tab_distribution_comparison"
+    st.session_state[tab_state_key] = True
     
     # Configurações
     st.markdown("### ⚙️ Configurações da Análise")
@@ -597,6 +605,20 @@ def _display_distribution_comparison_results(stat_analyzer, different_pairs_resu
     )
     if comparison_plot:
         st.plotly_chart(comparison_plot, use_container_width=True)
+    
+    # Adicionar botão de download PDF
+    from pdf_export_helpers import add_download_button_to_distribution_comparison
+    
+    # Extrair dados necessários para o PDF
+    asset1 = assets['asset1']
+    asset2 = assets['asset2']
+    comparison_tests = different_pairs_result.get('comparison_tests', {})
+    descriptive_stats = different_pairs_result.get('descriptive_stats', {})
+    data_points = different_pairs_result.get('data_points', {})
+    
+    add_download_button_to_distribution_comparison(
+        asset1, asset2, comparison_tests, descriptive_stats, data_points
+    )
 
 
 def _display_manual_comparison_results(stat_analyzer, result):
@@ -645,8 +667,7 @@ def _display_manual_comparison_results(stat_analyzer, result):
     
     # Dispersão
     plot_scatter_chart(returns1, returns2, asset1, asset2)
-    
-    # Interpretação dos resultados
+      # Interpretação dos resultados
     st.subheader("💡 Interpretação dos Resultados")
     
     if are_different:
@@ -667,6 +688,17 @@ def _display_manual_comparison_results(stat_analyzer, result):
         - **Correlação**: verifique a correlação entre eles para entender se movem juntos
         - **Análise setorial**: podem pertencer ao mesmo setor ou ser afetados pelos mesmos fatores
         """)
+        
+    # Adicionar botão de download PDF
+    from pdf_export_helpers import add_download_button_to_distribution_comparison
+    
+    # Extrair dados necessários para o PDF
+    comparison_tests = result.get('comparison_tests', {})
+    descriptive_stats = result.get('descriptive_stats', {})
+    
+    add_download_button_to_distribution_comparison(
+        asset1, asset2, comparison_tests, descriptive_stats, data_points
+    )
 
 
 def _display_statistical_tests(different_pairs_result):

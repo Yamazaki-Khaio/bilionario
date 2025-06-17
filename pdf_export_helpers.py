@@ -261,16 +261,14 @@ def generate_complete_statistical_analysis_pdf(df, asset_symbol=None):
             ax.set_xlabel('Data')
             ax.set_ylabel('Preço')
             plt.tight_layout()
-            
-            # Salvar o gráfico em um buffer
+              # Salvar o gráfico em um buffer
             img_buffer = io.BytesIO()
             plt.savefig(img_buffer, format='png', dpi=100)
             img_buffer.seek(0)
-            img = ImageReader(img_buffer)
             
             # Adicionar o gráfico ao PDF
             elements.append(Paragraph("Evolução de Preços", styles['Heading3']))
-            elements.append(Image(img, width=6*inch, height=3*inch))
+            elements.append(Image(img_buffer, width=6*inch, height=3*inch))
             elements.append(Spacer(1, 0.2*inch))
             
             plt.close(fig)
@@ -282,16 +280,14 @@ def generate_complete_statistical_analysis_pdf(df, asset_symbol=None):
             ax.set_xlabel('Retorno Diário')
             ax.set_ylabel('Densidade')
             plt.tight_layout()
-            
             # Salvar o gráfico em um buffer
             img_buffer = io.BytesIO()
             plt.savefig(img_buffer, format='png', dpi=100)
             img_buffer.seek(0)
-            img = ImageReader(img_buffer)
             
             # Adicionar o gráfico ao PDF
             elements.append(Paragraph("Distribuição de Retornos", styles['Heading3']))
-            elements.append(Image(img, width=6*inch, height=3*inch))
+            elements.append(Image(img_buffer, width=6*inch, height=3*inch))
             
             plt.close(fig)
         except Exception as e:
@@ -426,21 +422,355 @@ def generate_complete_statistical_analysis_pdf(df, asset_symbol=None):
 
 def add_download_buttons_to_extreme_analysis(selected_asset, threshold, prob_empirical, prob_normal, prob_t, df_param):
     """Adiciona botão de download para análise de eventos extremos"""
+    # Criar chaves únicas para este ativo e threshold
+    pdf_gen_key = f"pdf_generated_extreme_{selected_asset}_{threshold}"
+    pdf_error_key = f"pdf_error_extreme_{selected_asset}_{threshold}"
+    
+    # Inicializar o estado se necessário
+    if pdf_gen_key not in st.session_state:
+        st.session_state[pdf_gen_key] = None
+    
     st.markdown("### 📥 Exportar Análise")
     
-    if st.button("📄 Gerar PDF desta Análise", key=f"pdf_{selected_asset}_{threshold}"):
+    # Criar um container para mensagens de status
+    pdf_container = st.container()
+    
+    # Usar um formulário para evitar recarregamento completo da página
+    with st.form(key=f"pdf_form_extreme_{selected_asset}_{threshold}"):
+        st.caption(f"Clique abaixo para preparar o PDF com a análise de eventos extremos para {selected_asset}")
+        submit_button = st.form_submit_button(label="📄 Preparar PDF", use_container_width=True)
+        
+        if submit_button:
+            with st.spinner("Gerando PDF..."):
+                try:
+                    # Gerar PDF diretamente dentro do contexto do formulário
+                    pdf_data = generate_extreme_analysis_pdf(
+                        selected_asset, threshold, prob_empirical, prob_normal, prob_t, df_param
+                    )
+                    
+                    # Armazenar dados no session_state
+                    st.session_state[pdf_gen_key] = {
+                        "pdf_data": pdf_data,
+                        "asset": selected_asset,
+                        "threshold": threshold,
+                        "ready": True
+                    }
+                    
+                    # Não mostramos mensagem de sucesso aqui porque o formulário
+                    # ainda vai recarregar a página, mas agora o PDF estará no session_state
+                except Exception as e:
+                    st.session_state[pdf_error_key] = str(e)
+    
+    # Verificar se ocorreu algum erro durante a geração
+    if pdf_error_key in st.session_state and st.session_state[pdf_error_key]:
+        with pdf_container:
+            st.error(f"Erro ao gerar PDF: {st.session_state[pdf_error_key]}")
+            # Limpar erro após mostrar
+            st.session_state[pdf_error_key] = None
+    
+    # Verificar se o PDF foi gerado com sucesso
+    if st.session_state.get(pdf_gen_key) and st.session_state[pdf_gen_key].get("ready", False):
+        pdf_info = st.session_state[pdf_gen_key]
+        pdf_data = pdf_info["pdf_data"]
+        asset = pdf_info["asset"]
+        
+        with pdf_container:
+            st.success("PDF gerado com sucesso! Clique abaixo para baixar.")
+        
+        # Mostrar botão de download
+        download_button = create_download_button(
+            pdf_data,
+            f"analise_extremos_{asset.replace('.', '_')}.pdf", 
+            "⬇️ Baixar PDF"
+        )
+        st.markdown(download_button, unsafe_allow_html=True)
+    else:
+        # Mostrar dica quando não houver PDF gerado ainda
+        with pdf_container:
+            if not submit_button:  # Não mostrar quando acabamos de clicar no botão
+                st.info("Clique no botão acima para preparar o PDF antes de baixar")
+            
+def generate_distribution_comparison_pdf(asset1, asset2, comparison_tests, descriptive_stats, data_points):
+    """Gera PDF para comparação de distribuições estatísticas
+    
+    Args:
+        asset1 (str): Nome do primeiro ativo
+        asset2 (str): Nome do segundo ativo
+        comparison_tests (dict): Resultados dos testes estatísticos
+        descriptive_stats (dict): Estatísticas descritivas dos dois ativos
+        data_points (dict): Número de pontos de dados para cada ativo
+    
+    Returns:
+        bytes: Conteúdo do PDF
+    """
+    import matplotlib.pyplot as plt
+    import io
+    
+    buffer = BytesIO()
+    pdf = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Título e cabeçalho
+    title_style = ParagraphStyle(
+        name="Title",
+        fontSize=18,
+        alignment=1,
+        spaceAfter=12
+    )
+    
+    elements.append(Paragraph(f"Comparação Estatística de Distribuições", title_style))
+    elements.append(Spacer(1, 0.2*inch))
+    elements.append(Paragraph(f"{asset1} vs {asset2}", styles['Heading2']))
+    elements.append(Spacer(1, 0.1*inch))
+    elements.append(Paragraph(f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Sumário dos dados
+    elements.append(Paragraph("Resumo dos Dados", styles['Heading2']))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    data_summary = [
+        ["Ativo", "Observações"],
+        [asset1, str(data_points.get(asset1, "N/A"))],
+        [asset2, str(data_points.get(asset2, "N/A"))]
+    ]
+    
+    summary_table = Table(data_summary, colWidths=[3*inch, 2*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    
+    elements.append(summary_table)
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Resultados dos Testes Estatísticos
+    elements.append(Paragraph("Resultados dos Testes Estatísticos", styles['Heading2']))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Verificar se temos testes estatísticos
+    if comparison_tests:
+        test_data = [["Teste", "Estatística", "P-valor", "Significativo"]]
+        
+        # Teste KS
+        if 'ks_test' in comparison_tests:
+            ks_test = comparison_tests['ks_test']
+            test_data.append([
+                "Kolmogorov-Smirnov", 
+                f"{ks_test.get('statistic', 'N/A'):.4f}", 
+                f"{ks_test.get('p_value', 'N/A'):.4f}", 
+                "✓" if ks_test.get('significant', False) else "✗"
+            ])
+        
+        # Mann-Whitney U
+        if 'mann_whitney' in comparison_tests:
+            mw_test = comparison_tests['mann_whitney']
+            test_data.append([
+                "Mann-Whitney U", 
+                f"{mw_test.get('statistic', 'N/A'):.4f}", 
+                f"{mw_test.get('p_value', 'N/A'):.4f}", 
+                "✓" if mw_test.get('significant', False) else "✗"
+            ])
+        
+        # Levene
+        if 'levene' in comparison_tests:
+            levene_test = comparison_tests['levene']
+            test_data.append([
+                "Levene", 
+                f"{levene_test.get('statistic', 'N/A'):.4f}", 
+                f"{levene_test.get('p_value', 'N/A'):.4f}",
+                "✓" if levene_test.get('significant', False) else "✗"
+            ])
+        
+        test_table = Table(test_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1*inch])
+        test_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        
+        elements.append(test_table)
+    else:
+        elements.append(Paragraph("Não há resultados de testes estatísticos disponíveis.", styles['Normal']))
+    
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Interpretação dos Testes
+    # Determinar se são significativamente diferentes
+    are_different = False
+    if comparison_tests:
+        ks_significant = comparison_tests.get('ks_test', {}).get('significant', False)
+        mw_significant = comparison_tests.get('mann_whitney', {}).get('significant', False)
+        are_different = ks_significant or mw_significant
+    
+    elements.append(Paragraph("Interpretação", styles['Heading2']))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    if are_different:
+        elements.append(Paragraph(f"✅ Os ativos {asset1} e {asset2} têm distribuições estatisticamente diferentes.", styles['Normal']))
+        elements.append(Paragraph("Isto indica que eles têm comportamentos de mercado distintos, o que pode ser relevante para:", styles['Normal']))
+        elements.append(Spacer(1, 0.1*inch))
+        elements.append(Paragraph("• Diversificação de portfolio: ativos com comportamentos diferentes ajudam na diversificação", styles['Normal']))
+        elements.append(Paragraph("• Pair trading: confirme também a cointegração para estratégias de pair trading", styles['Normal']))
+        elements.append(Paragraph("• Alocação de risco: o ativo com maior volatilidade deve receber menor alocação", styles['Normal']))
+    else:
+        elements.append(Paragraph(f"ℹ️ Os ativos {asset1} e {asset2} não apresentaram diferença estatisticamente significativa.", styles['Normal']))
+        elements.append(Paragraph("Isso sugere comportamentos similares em termos de distribuição de retornos:", styles['Normal']))
+        elements.append(Spacer(1, 0.1*inch))
+        elements.append(Paragraph("• Diversificação limitada: estes ativos podem oferecer menos benefícios de diversificação", styles['Normal']))
+        elements.append(Paragraph("• Correlação: verifique a correlação entre eles para entender se movem juntos", styles['Normal']))
+        elements.append(Paragraph("• Análise setorial: podem pertencer ao mesmo setor ou ser afetados pelos mesmos fatores", styles['Normal']))
+    
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Tabelas de Estatísticas Descritivas
+    elements.append(Paragraph("Estatísticas Descritivas", styles['Heading2']))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Verificar se temos estatísticas descritivas
+    if descriptive_stats:
+        # Tabela para o primeiro ativo
+        if asset1 in descriptive_stats:
+            elements.append(Paragraph(f"Ativo: {asset1}", styles['Heading3']))
+            elements.append(Spacer(1, 0.1*inch))
+            
+            asset1_stats = descriptive_stats[asset1]
+            stats_data1 = [
+                ["Métrica", "Valor"],
+                ["Média", f"{asset1_stats.get('mean', 'N/A'):.5f}"],
+                ["Mediana", f"{asset1_stats.get('median', 'N/A'):.5f}"],
+                ["Desvio Padrão", f"{asset1_stats.get('std', 'N/A'):.5f}"],
+                ["Assimetria", f"{asset1_stats.get('skew', 'N/A'):.5f}"],
+                ["Curtose", f"{asset1_stats.get('kurtosis', 'N/A'):.5f}"]
+            ]
+            
+            stats_table1 = Table(stats_data1, colWidths=[2*inch, 2*inch])
+            stats_table1.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            
+            elements.append(stats_table1)
+            elements.append(Spacer(1, 0.2*inch))
+        
+        # Tabela para o segundo ativo
+        if asset2 in descriptive_stats:
+            elements.append(Paragraph(f"Ativo: {asset2}", styles['Heading3']))
+            elements.append(Spacer(1, 0.1*inch))
+            
+            asset2_stats = descriptive_stats[asset2]
+            stats_data2 = [
+                ["Métrica", "Valor"],
+                ["Média", f"{asset2_stats.get('mean', 'N/A'):.5f}"],
+                ["Mediana", f"{asset2_stats.get('median', 'N/A'):.5f}"],
+                ["Desvio Padrão", f"{asset2_stats.get('std', 'N/A'):.5f}"],
+                ["Assimetria", f"{asset2_stats.get('skew', 'N/A'):.5f}"],
+                ["Curtose", f"{asset2_stats.get('kurtosis', 'N/A'):.5f}"]
+            ]
+            
+            stats_table2 = Table(stats_data2, colWidths=[2*inch, 2*inch])
+            stats_table2.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            
+            elements.append(stats_table2)
+    else:
+        elements.append(Paragraph("Não há estatísticas descritivas disponíveis.", styles['Normal']))
+    
+    # Rodapé
+    elements.append(Spacer(1, 0.5*inch))
+    footnote_style = ParagraphStyle(
+        name='Footnote',
+        fontSize=8,
+        alignment=1
+    )
+    elements.append(Paragraph("Análise gerada automaticamente pelo Sistema Bilionário", footnote_style))
+    elements.append(Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", footnote_style))
+    
+    # Construir PDF
+    pdf.build(elements)
+    return buffer.getvalue()
+
+def add_download_button_to_distribution_comparison(asset1, asset2, comparison_tests, descriptive_stats, data_points):
+    """Adiciona botão de download para comparação estatística de distribuições
+    
+    Args:
+        asset1 (str): Nome do primeiro ativo
+        asset2 (str): Nome do segundo ativo
+        comparison_tests (dict): Resultados dos testes estatísticos
+        descriptive_stats (dict): Estatísticas descritivas dos dois ativos
+        data_points (dict): Número de pontos de dados para cada ativo
+    """
+    # Criar chaves únicas para este par de ativos
+    pdf_gen_key = f"pdf_generated_{asset1}_{asset2}"
+    pdf_error_key = f"pdf_error_{asset1}_{asset2}"
+    
+    # Inicializar o estado se necessário
+    if pdf_gen_key not in st.session_state:
+        st.session_state[pdf_gen_key] = None
+    
+    st.markdown("### 📥 Exportar Análise")
+    
+    # Criar um container para mensagens de status
+    pdf_container = st.container()
+    
+    # Gerar PDF automaticamente quando encontrar pares diferentes
+    if st.session_state.get(pdf_gen_key) is None:
         try:
-            with st.spinner("Gerando PDF da análise de eventos extremos..."):
-                pdf_data = generate_extreme_analysis_pdf(
-                    selected_asset, threshold, prob_empirical, prob_normal, prob_t, df_param
+            with st.spinner("Gerando PDF..."):
+                # Gerar PDF diretamente
+                pdf_data = generate_distribution_comparison_pdf(
+                    asset1, asset2, comparison_tests, descriptive_stats, data_points
                 )
                 
-                download_button = create_download_button(
-                    pdf_data,
-                    f"analise_extremos_{selected_asset.replace('.', '_')}.pdf", 
-                    "Baixar Análise de Eventos Extremos (PDF)"
-                )
-                st.markdown(download_button, unsafe_allow_html=True)
-                st.success("PDF gerado com sucesso! Clique no botão acima para baixar.")
+                # Armazenar dados no session_state
+                st.session_state[pdf_gen_key] = {
+                    "pdf_data": pdf_data,
+                    "asset1": asset1,
+                    "asset2": asset2,
+                    "ready": True
+                }
         except Exception as e:
-            st.error(f"Erro ao gerar PDF: {str(e)}")
+            st.session_state[pdf_error_key] = str(e)
+    
+    # Verificar se ocorreu algum erro durante a geração
+    if pdf_error_key in st.session_state and st.session_state[pdf_error_key]:
+        with pdf_container:
+            st.error(f"Erro ao gerar PDF: {st.session_state[pdf_error_key]}")
+            # Limpar erro após mostrar
+            st.session_state[pdf_error_key] = None
+    
+    # Verificar se o PDF foi gerado com sucesso
+    if st.session_state.get(pdf_gen_key) and st.session_state[pdf_gen_key].get("ready", False):
+        pdf_info = st.session_state[pdf_gen_key]
+        pdf_data = pdf_info["pdf_data"]
+        a1 = pdf_info["asset1"]
+        a2 = pdf_info["asset2"]
+        
+        with pdf_container:
+            st.success("PDF gerado com sucesso! Clique abaixo para baixar.")
+        
+        # Mostrar botão de download diretamente
+        download_button = create_download_button(
+            pdf_data,
+            f"comparacao_distribuicoes_{a1.replace('.', '_')}_{a2.replace('.', '_')}.pdf", 
+            "⬇️ Baixar PDF"
+        )
+        st.markdown(download_button, unsafe_allow_html=True)
